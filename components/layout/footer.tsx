@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin } from "lucide-react";
+import { Logo } from "@/components/layout/logo";
 
 export function Footer() {
   return (
@@ -7,11 +7,8 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="md:col-span-2">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-muted border border-border-accent">
-                <MapPin className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-lg font-semibold">Blistrip</span>
+            <div className="mb-4">
+              <Logo href={null} />
             </div>
             <p className="text-sm text-foreground-secondary max-w-sm leading-relaxed">
               Tell us the trip you&apos;re dreaming about. We&apos;ll figure out the rest.

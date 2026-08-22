@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, X, MapPin } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/layout/logo";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -20,12 +21,7 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-xl">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-muted border border-border-accent">
-            <MapPin className="h-4 w-4 text-primary" />
-          </div>
-          <span className="text-lg font-semibold tracking-tight text-foreground">Blistrip</span>
-        </Link>
+        <Logo />
 
         <div className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => (

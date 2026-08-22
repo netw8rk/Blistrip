@@ -6,7 +6,7 @@
 const PHOTOS = {
   heroParis: "1566902145833-0475c9f1a1bf",
   ctaMountains: "1476514525535-07fb3b4ae5f1",
-  prague: "1605649487212-47bdab064df7",
+  prague: "1600623471616-8c1966c91ff6",
   budapest: "1548013146-72479768bada",
   krakow: "1516550893923-42d28e5677af",
   vienna: "1516550893923-42d28e5677af",
@@ -18,6 +18,9 @@ const PHOTOS = {
   porto: "1524231757912-21f4fe3a7200",
   europeStreet: "1499856871958-5b9627545d1a",
   travelFlatlay: "1488646953014-85cb44e25828",
+  travelersPlanning: "1586022045076-aee0a185180b",
+  travelersExploring: "1501785888041-af3ef285b470",
+  travelersEnjoying: "1506012787146-f92b2d7d6d96",
 } as const;
 
 export function getImageUrl(photoId: string, width = 800): string {
@@ -28,6 +31,11 @@ export const images = {
   hero: getImageUrl(PHOTOS.heroParis, 1400),
   cta: getImageUrl(PHOTOS.ctaMountains, 1200),
   travelFlatlay: getImageUrl(PHOTOS.travelFlatlay, 600),
+  howItWorks: {
+    plan: getImageUrl(PHOTOS.travelersPlanning, 900),
+    personalize: getImageUrl(PHOTOS.travelersExploring, 900),
+    book: getImageUrl(PHOTOS.travelersEnjoying, 900),
+  },
 } as const;
 
 const destinationPhotoMap: Record<string, string> = {

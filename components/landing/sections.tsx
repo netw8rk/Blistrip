@@ -3,12 +3,10 @@ import Image from "next/image";
 import {
   ArrowRight,
   Sparkles,
-  Map,
-  DollarSign,
-  Compass,
-  Target,
-  Layers,
-  TrendingUp,
+  UserRoundCheck,
+  CircleDollarSign,
+  Layers3,
+  Binoculars,
   Users,
   Mountain,
   UtensilsCrossed,
@@ -21,18 +19,44 @@ import { examplePragueTrip } from "@/lib/mock-data";
 import { images, getDestinationImage } from "@/lib/images";
 import { DestinationCarousel } from "@/components/landing/destination-carousel";
 
+function SectionHeader({
+  title,
+  subtitle,
+}: {
+  title: React.ReactNode;
+  subtitle?: string;
+}) {
+  return (
+    <div className="mx-auto mb-6 max-w-2xl text-center lg:mb-8">
+      <div className="mx-auto mb-3 flex items-center justify-center gap-3">
+        <span aria-hidden className="h-px w-10 bg-gradient-to-r from-transparent to-primary/45" />
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+        <span aria-hidden className="h-px w-10 bg-gradient-to-l from-transparent to-primary/45" />
+      </div>
+      <h2 className="text-2xl sm:text-3xl lg:text-[2rem] font-semibold tracking-tight text-foreground leading-[1.15]">
+        {title}
+      </h2>
+      {subtitle ? (
+        <p className="mt-3 text-sm sm:text-[15px] text-foreground-secondary leading-relaxed">
+          {subtitle}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function HeroSection() {
   return (
     <section className="section-base">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-        <div className="relative overflow-hidden rounded-2xl border border-border shadow-sm animate-slide-up min-h-[480px] sm:min-h-[500px] lg:min-h-[520px] max-h-[640px]">
+      <div className="mx-auto max-w-[83rem] px-4 sm:px-5 lg:px-6 py-6 lg:py-8">
+        <div className="relative overflow-hidden rounded-2xl border border-border shadow-sm animate-slide-up min-h-[520px] sm:min-h-[540px] lg:min-h-[580px] max-h-[680px]">
           <Image
             src={images.hero}
             alt="Eiffel Tower and Paris skyline"
             fill
             className="object-cover object-[65%_center] sm:object-[70%_center]"
             priority
-            sizes="(max-width: 1280px) 100vw, 1280px"
+            sizes="(max-width: 1328px) 100vw, 1328px"
           />
 
           {/* Left scrim — localized fade, not a full-card wash */}
@@ -50,22 +74,25 @@ export function HeroSection() {
             className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background/25 to-transparent sm:hidden"
           />
 
-          <div className="relative z-10 flex h-full min-h-[480px] sm:min-h-[500px] lg:min-h-[520px] flex-col justify-end p-5 sm:p-6 lg:p-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
-            <div className="max-w-md lg:max-w-lg shrink-0">
-              <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border-accent bg-primary-muted px-3 py-1 text-[11px] font-medium text-primary mb-3">
-                <Sparkles className="h-3 w-3" />
-                AI-powered travel planning
-              </span>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-[1.1] tracking-tight text-foreground mb-2.5">
-                Your trip,
-                <br />
-                <span className="text-gradient">planned in minutes.</span>
-              </h1>
-              <p className="text-sm sm:text-base text-foreground-secondary max-w-sm leading-relaxed">
-                Budget, dates, vibe — tell Blistrip what matters and get a full itinerary built around you.
-              </p>
+          <span className="absolute left-5 top-5 z-20 inline-flex w-fit items-center gap-1.5 rounded-full border border-border/80 bg-surface/75 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur-md sm:left-6 sm:top-6 sm:text-[13px] lg:left-8 lg:top-8">
+            <Sparkles className="h-3.5 w-3.5 text-foreground" />
+            AI-powered travel planning
+          </span>
 
-              <div className="mt-4 flex max-w-sm items-center gap-4 sm:gap-6">
+          <div className="relative z-10 flex h-full min-h-[520px] sm:min-h-[540px] lg:min-h-[580px] flex-col justify-end p-5 sm:p-6 lg:p-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+            <div className="flex max-w-md shrink-0 flex-col gap-5 sm:gap-6 lg:max-w-lg">
+              <div>
+                <h1 className="mb-2 text-2xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-3xl lg:text-4xl">
+                  Your trip,
+                  <br />
+                  <span className="text-gradient">planned in minutes.</span>
+                </h1>
+                <p className="max-w-sm text-base leading-snug text-foreground sm:text-lg">
+                  Budget, dates, vibe — tell Blistrip what matters and get a full itinerary built around you.
+                </p>
+              </div>
+
+              <div className="flex max-w-sm items-center gap-4 sm:gap-6">
                 {[
                   { value: "8", label: "Step planner" },
                   { value: "10+", label: "Destinations" },
@@ -78,7 +105,7 @@ export function HeroSection() {
                 ))}
               </div>
 
-              <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
+              <div className="flex flex-col gap-2.5 sm:flex-row">
                 <Link href="/planner">
                   <Button className="w-full sm:w-auto h-10 px-5">
                     Plan My Trip
@@ -93,20 +120,20 @@ export function HeroSection() {
               </div>
             </div>
 
-            <div className="mt-5 w-full shrink-0 sm:max-w-md lg:mt-0 lg:max-w-none lg:w-[360px] xl:w-[400px]">
-              <div className="hero-glass p-5 sm:p-6">
-                <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted mb-1.5">Quick Plan</p>
-                <h2 className="text-base font-semibold text-foreground mb-4">Pick a trip style</h2>
-                <div className="grid grid-cols-2 gap-2.5 mb-4">
+            <div className="mt-5 w-full shrink-0 sm:max-w-md lg:mt-0 lg:max-w-none lg:w-[400px] xl:w-[440px]">
+              <div className="hero-glass p-6 sm:p-7">
+                <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-muted">Quick Plan</p>
+                <h2 className="mb-5 text-lg font-semibold text-foreground">Pick a trip style</h2>
+                <div className="mb-5 grid grid-cols-2 gap-3">
                   <QuickPlanChip icon={Mountain} label="City break" />
                   <QuickPlanChip icon={UtensilsCrossed} label="Food & culture" />
                   <QuickPlanChip icon={Palmtree} label="Beach escape" />
                   <QuickPlanChip icon={Users} label="Group trip" />
                 </div>
                 <Link href="/planner">
-                  <Button className="w-full h-10 text-sm">
+                  <Button className="h-11 w-full text-base">
                     Start Planning
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
               </div>
@@ -121,9 +148,9 @@ export function HeroSection() {
 function QuickPlanChip({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
     <Link href="/planner" className="min-w-0">
-      <div className="group flex h-full flex-col items-start gap-1.5 rounded-lg border border-border/60 bg-background/60 px-3 py-2.5 hover:border-border hover:bg-surface/80 transition-colors cursor-pointer">
-        <Icon className="h-4 w-4 text-muted shrink-0 group-hover:text-foreground-secondary transition-colors" />
-        <span className="text-xs font-medium text-foreground-secondary group-hover:text-foreground transition-colors leading-snug">
+      <div className="group flex h-full cursor-pointer flex-col items-start gap-2 rounded-lg border border-border/60 bg-background/60 px-3.5 py-3 transition-colors hover:border-border hover:bg-surface/80">
+        <Icon className="h-5 w-5 shrink-0 text-muted transition-colors group-hover:text-foreground-secondary" />
+        <span className="text-sm font-medium leading-snug text-foreground-secondary transition-colors group-hover:text-foreground">
           {label}
         </span>
       </div>
@@ -150,64 +177,62 @@ export function DestinationStripSection() {
 export function HowItWorksSection() {
   const steps = [
     {
-      icon: Map,
       step: "01",
       title: "Tell us about your trip",
       description: "Destination, dates, budget, and how you like to travel.",
+      image: images.howItWorks.plan,
+      alt: "Man with a backpack standing on a rock formation while traveling",
     },
     {
-      icon: Sparkles,
       step: "02",
       title: "Get your personalized plan",
       description: "Neighborhoods, hotels, daily itinerary, and a budget breakdown.",
+      image: images.howItWorks.personalize,
+      alt: "Wooden boats on a blue lake surrounded by mountains",
     },
     {
-      icon: Compass,
       step: "03",
       title: "Book with confidence",
       description: "Use your plan to book stays, activities, and essentials.",
+      image: images.howItWorks.book,
+      alt: "Airplane flying through a golden sunset sky",
     },
   ];
 
   return (
-    <section className="py-16 section-alt border-t border-border">
+    <section className="py-10 lg:py-12 section-alt border-t border-border">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-10">
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
-            How Blistrip Works
-          </h2>
+        <SectionHeader title="How Blistrip Works" />
+
+        <div className="grid md:grid-cols-3 gap-4 lg:gap-5">
+          {steps.map((step) => (
+            <div key={step.title} className="group flex flex-col">
+              <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-border mb-3">
+                <Image
+                  src={step.image}
+                  alt={step.alt}
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                />
+                <div
+                  aria-hidden
+                  className="absolute inset-0 bg-gradient-to-t from-foreground/35 via-transparent to-transparent"
+                />
+                <span className="absolute top-3 left-3 inline-flex items-center rounded-full border border-white/30 bg-background/85 px-2.5 py-1 text-[11px] font-semibold tracking-[0.12em] text-foreground backdrop-blur-sm">
+                  {step.step}
+                </span>
+              </div>
+              <h3 className="subcontainer-title mb-1">{step.title}</h3>
+              <p className="subcontainer-body text-[13px] leading-snug">{step.description}</p>
+            </div>
+          ))}
         </div>
 
-        <div className="rounded-2xl border border-border bg-surface overflow-hidden">
-          <div className="grid md:grid-cols-3 md:divide-x divide-border">
-            {steps.map((step) => (
-              <div
-                key={step.title}
-                className="flex gap-4 p-6 lg:p-8 transition-colors hover:bg-surface-hover/20 border-b border-border md:border-b-0 last:border-b-0"
-              >
-                <div className="flex flex-col items-center shrink-0">
-                  <span className="subcontainer-meta mb-3">
-                    {step.step}
-                  </span>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-muted border border-border-accent">
-                    <step.icon className="h-5 w-5 text-primary" />
-                  </div>
-                </div>
-                <div className="min-w-0 pt-0.5">
-                  <h3 className="subcontainer-title mb-1.5">{step.title}</h3>
-                  <p className="subcontainer-body">{step.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-end border-t border-border px-6 py-4 lg:px-8">
-            <Link
-              href="/about"
-              className="subcontainer-link flex items-center gap-1"
-            >
-              Learn more <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
+        <div className="mt-5 flex justify-center sm:justify-end">
+          <Link href="/about" className="subcontainer-link flex items-center gap-1">
+            Learn more <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </div>
     </section>
@@ -215,51 +240,57 @@ export function HowItWorksSection() {
 }
 
 export function WhyBlistripSection() {
-  const cards = [
+  const features = [
     {
-      icon: Target,
+      icon: UserRoundCheck,
       title: "Built Around You",
       description: "Recommendations matched to your interests and pace — not generic lists.",
     },
     {
-      icon: DollarSign,
+      icon: CircleDollarSign,
       title: "Budget-Aware",
-      description: "Realistic cost estimates that stay within what you want to spend.",
+      description: "Realistic costs based on how you actually want to spend.",
     },
     {
-      icon: Layers,
+      icon: Layers3,
       title: "More Than an Itinerary",
-      description: "Neighborhoods, stays, food, transport, and tips in one plan.",
+      description: "Stays, neighborhoods, food, and experiences in one plan.",
     },
     {
-      icon: TrendingUp,
+      icon: Binoculars,
       title: "Travel Smarter",
-      description: "Local favorites and neighborhoods that fit how you actually travel.",
+      description: "Local picks that fit the way you actually travel.",
     },
   ];
 
   return (
-    <section className="py-16 section-base border-t border-border">
+    <section className="border-t border-border bg-background py-10 lg:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-10">
-          <p className="eyebrow mb-3">Why Blistrip</p>
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
-            Your budget. Your interests. Your pace.
-          </h2>
-          <p className="subcontainer-body max-w-xl mx-auto">
-            One personalized trip plan built around what matters to you.
+        <div className="mb-8 max-w-xl lg:mb-9">
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[13px]">
+            Why Blistrip
           </p>
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl leading-[1.15]">
+            Travel planning that actually feels like yours.
+          </h2>
         </div>
 
-        <div className="rounded-2xl overflow-hidden border border-border">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-border">
-            {cards.map((card) => (
-              <div key={card.title} className="bg-surface p-6 lg:p-7">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-muted border border-border mb-4">
-                  <card.icon className="h-4 w-4 text-foreground-secondary" />
-                </div>
-                <h3 className="subcontainer-title mb-2">{card.title}</h3>
-                <p className="subcontainer-body">{card.description}</p>
+        <div className="border-t border-border">
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x">
+            {features.map((feature) => (
+              <div
+                key={feature.title}
+                className="py-6 sm:px-6 sm:py-7 lg:px-7 lg:py-6 first:sm:pl-0 last:sm:pr-0 lg:first:pl-0 lg:last:pr-0"
+              >
+                <feature.icon
+                  className="mb-3 h-4 w-4 text-muted"
+                  strokeWidth={1.5}
+                  aria-hidden
+                />
+                <h3 className="subcontainer-title mb-1.5">{feature.title}</h3>
+                <p className="subcontainer-body max-w-[16rem] text-[13px] leading-snug">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -277,7 +308,9 @@ export function ExampleTripSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-start">
           <div>
-            <p className="eyebrow mb-3">Example Trip</p>
+            <p className="mb-3 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[13px]">
+              Example Trip
+            </p>
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
               <span className="text-destination">{trip.destination}</span>, {trip.country}
             </h2>
@@ -289,10 +322,10 @@ export function ExampleTripSection() {
             <p className="subcontainer-body mb-6">{trip.tripSummary}</p>
 
             {/* Trip image */}
-            <div className="relative h-48 rounded-xl overflow-hidden mb-6">
+            <div className="relative mb-6 h-72 w-full overflow-hidden rounded-xl sm:h-80">
               <Image
                 src={getDestinationImage("Prague", 800)}
-                alt="Prague Old Town"
+                alt="Charles Bridge and Prague Castle at golden hour"
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 50vw"
@@ -316,9 +349,9 @@ export function ExampleTripSection() {
                   <div>
                     <h4 className="subcontainer-title mb-1">{day.title}</h4>
                     <div className="space-y-1 subcontainer-body text-muted">
-                      <p><span className="text-primary/80 font-medium">AM</span> &middot; <span className="text-highlight">{day.morning[0]?.name}</span></p>
-                      <p><span className="text-primary/80 font-medium">PM</span> &middot; <span className="text-highlight">{day.afternoon[0]?.name}</span></p>
-                      <p><span className="text-primary/80 font-medium">EVE</span> &middot; <span className="text-highlight">{day.evening[0]?.name}</span></p>
+                      <p><span className="font-medium text-foreground-secondary">AM</span> &middot; <span className="text-highlight">{day.morning[0]?.name}</span></p>
+                      <p><span className="font-medium text-foreground-secondary">PM</span> &middot; <span className="text-highlight">{day.afternoon[0]?.name}</span></p>
+                      <p><span className="font-medium text-foreground-secondary">EVE</span> &middot; <span className="text-highlight">{day.evening[0]?.name}</span></p>
                     </div>
                   </div>
                 </div>
