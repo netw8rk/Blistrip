@@ -56,6 +56,7 @@ export interface PlannedActivity {
   providerPlaceId?: string;
   address?: string;
   mapsUrl?: string;
+  photoUrl?: string;
 }
 
 export interface PlannedDay {

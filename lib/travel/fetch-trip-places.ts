@@ -278,6 +278,11 @@ function toPlanned(place: NormalizedPlace, slot: string): PlannedActivity {
     reason: `${titleCase(place.type)} in ${place.city} for a ${slot} stop.`,
     reservationRecommended: place.type === "restaurant",
     source: "verified",
+    provider: place.provider,
+    providerPlaceId: place.providerPlaceId,
+    address: place.address,
+    mapsUrl: place.mapsUrl,
+    photoUrl: place.photoUrls?.[0],
   };
 }
 

@@ -106,6 +106,7 @@ export interface ItineraryActivity {
   address?: string;
   rating?: number;
   mapsUrl?: string;
+  photoUrl?: string;
 }
 
 export interface DailyItinerary {
@@ -140,6 +141,7 @@ export interface TripPlan {
   destinationLabel?: string;
   destinationLatitude?: number;
   destinationLongitude?: number;
+  destinationPhotoUrl?: string;
   dates: string;
   duration: number;
   estimatedBudget: number;

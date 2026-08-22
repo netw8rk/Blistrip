@@ -24,7 +24,7 @@ const PHOTOS = {
 } as const;
 
 export function getImageUrl(photoId: string, width = 800): string {
-  return `https://images.unsplash.com/photo-${photoId}?auto=format&fit=crop&w=${width}&q=80`;
+  return `https://images.unsplash.com/photo-${photoId}?auto=format&fit=crop&w=${width}&q=90&dpr=2`;
 }
 
 export const images = {
@@ -56,6 +56,10 @@ export function getDestinationImage(destination: string, width = 800): string {
   const key = destination.toLowerCase().replace(/[^a-z]/g, "");
   const photoId = destinationPhotoMap[key] ?? PHOTOS.europeStreet;
   return getImageUrl(photoId, width);
+}
+
+export function getHeroDestinationImage(destination: string): string {
+  return getDestinationImage(destination, 2400);
 }
 
 export const popularDestinations = [

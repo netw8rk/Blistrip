@@ -36,6 +36,7 @@ function toItineraryActivity(
     providerPlaceId: planned.providerPlaceId,
     address: planned.address,
     mapsUrl: planned.mapsUrl,
+    photoUrl: planned.photoUrl,
   };
 }
 

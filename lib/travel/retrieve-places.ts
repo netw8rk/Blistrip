@@ -37,6 +37,7 @@ export interface PlaceRetrievalResult {
   restaurants: RankedPlace[];
   diningAndNightlife: RankedPlace[];
   providers?: string[];
+  destinationPhotoUrl?: string;
 }
 
 const osm = new OpenStreetMapProvider();
@@ -183,7 +184,7 @@ export async function retrievePersonalizedPlaces(
       ? { lat: prefs.latitude, lon: prefs.longitude }
       : null;
 
-  const [googlePlaces, osmRaw] = await Promise.all([
+  const [googlePlaces, osmRaw, heroPlaces] = await Promise.all([
     searchGoogleRequirements(prefs, requirements),
     osm.searchByQueries(
       prefs.destination,
@@ -191,6 +192,7 @@ export async function retrievePersonalizedPlaces(
       queries,
       origin ? { lat: origin.lat, lon: origin.lon, state: prefs.state } : undefined
     ),
+    searchDestinationHeroPlaces(prefs),
   ]);
 
   const providers = [
@@ -260,6 +262,7 @@ export async function retrievePersonalizedPlaces(
     hotels: hotelsSlice,
     restaurants: restaurantsSlice,
     diningAndNightlife: diningSlice,
+    destinationPhotoUrl: pickDestinationHeroPhoto([...heroPlaces, ...googleCards]),
   };
 }
 
@@ -462,6 +465,33 @@ async function searchGoogleRequirements(
   );
 
   return results.flatMap((result) => result.places).filter((place) => place.name && place.providerPlaceId);
+}
+
+async function searchDestinationHeroPlaces(prefs: UserTripPreferences): Promise<NormalizedPlace[]> {
+  if (!google.isConfigured() || prefs.latitude == null || prefs.longitude == null) return [];
+  const result = await google.searchPlaces({
+    query: `${prefs.destinationLabel || prefs.destination} skyline landmarks`,
+    type: "attraction",
+    city: prefs.destination,
+    country: prefs.country,
+    latitude: prefs.latitude,
+    longitude: prefs.longitude,
+    radiusMeters: 20000,
+    limit: 6,
+  });
+  return result.places.filter((place) => place.photoUrls?.[0]);
+}
+
+function pickDestinationHeroPhoto(places: NormalizedPlace[]): string | undefined {
+  const preferred = ["landmark", "attraction", "park", "museum", "church"];
+  const scored = places
+    .filter((place) => place.photoUrls?.[0])
+    .sort((a, b) => {
+      const aBoost = preferred.includes(a.type) ? 10 : 0;
+      const bBoost = preferred.includes(b.type) ? 10 : 0;
+      return bBoost + (b.rating ?? 0) - (aBoost + (a.rating ?? 0));
+    });
+  return scored[0]?.photoUrls?.[0];
 }
 
 async function hydrateGooglePlaceCards(places: NormalizedPlace[]): Promise<void> {
@@ -683,6 +713,7 @@ function toPlanned(item: RankedPlace, prefs: UserTripPreferences): PlannedActivi
     providerPlaceId: item.place.providerPlaceId,
     address: item.place.address,
     mapsUrl: item.place.mapsUrl,
+    photoUrl: item.place.photoUrls?.[0],
   };
 }
 
@@ -753,6 +784,7 @@ export function constrainItineraryToPool(
       providerPlaceId: found.place.providerPlaceId,
       mapsUrl: found.place.mapsUrl,
       rating: found.place.rating,
+      photoUrl: found.place.photoUrls?.[0],
       source: "verified",
     };
   };
@@ -782,6 +814,7 @@ export function constrainItineraryToPool(
           providerPlaceId: item.place.providerPlaceId,
           mapsUrl: item.place.mapsUrl,
           rating: item.place.rating,
+          photoUrl: item.place.photoUrls?.[0],
           source: "verified",
         };
         if (slots.morning.length === 0) slots.morning.push(filler);
@@ -827,6 +860,7 @@ export function constrainItineraryToPool(
       destinationLabel: prefs.destinationLabel || plan.destinationLabel,
       destinationLatitude: prefs.latitude ?? plan.destinationLatitude,
       destinationLongitude: prefs.longitude ?? plan.destinationLongitude,
+      destinationPhotoUrl: retrieval.destinationPhotoUrl || plan.destinationPhotoUrl,
       dailyItinerary,
       hotelRecommendations: hotelRecs.length ? hotelRecs : [],
       restaurants: restaurantRecs,
@@ -894,6 +928,7 @@ export function buildPlanFromRetrieval(
     destinationLabel: prefs.destinationLabel,
     destinationLatitude: prefs.latitude,
     destinationLongitude: prefs.longitude,
+    destinationPhotoUrl: retrieval.destinationPhotoUrl,
     dates: prefs.dates ? `${prefs.dates.start} – ${prefs.dates.end}` : "Flexible dates",
     duration: prefs.tripLength,
     estimatedBudget: budget.total,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BudgetBar } from "@/components/ui/progress";
 import { SimpleDialog } from "@/components/ui/dialog";
@@ -29,7 +29,7 @@ import {
   setActiveTrip,
 } from "@/lib/storage";
 import type { ActivityRecommendation, ItineraryActivity, TripPlan } from "@/types/trip";
-import { getDestinationImage } from "@/lib/images";
+import { getDestinationImage, getHeroDestinationImage } from "@/lib/images";
 import { googlePlacePageUrl, isGooglePhotoSrc } from "@/lib/travel/google-links";
 import { TripRefinePanel } from "@/components/trip/trip-refine-panel";
 import {
@@ -54,6 +54,7 @@ export function TripResults({ tripId }: TripResultsProps) {
   const [showExtras, setShowExtras] = useState(false);
   const [activityTypeFilter, setActivityTypeFilter] = useState("all");
   const [whyDialog, setWhyDialog] = useState<{ title: string; reason: string } | null>(null);
+  const [heroPhotoUrl, setHeroPhotoUrl] = useState<string | undefined>();
 
   useEffect(() => {
     const preferActive = searchParams.get("fresh") === "1";
@@ -66,6 +67,27 @@ export function TripResults({ tripId }: TripResultsProps) {
       window.history.replaceState(null, "", `/trip/${plan.id}`);
     }
   }, [tripId, searchParams]);
+
+  useEffect(() => {
+    if (!trip) return;
+    if (trip.destinationPhotoUrl) {
+      setHeroPhotoUrl(trip.destinationPhotoUrl);
+      return;
+    }
+    if (trip.destinationLatitude == null || trip.destinationLongitude == null) return;
+    const params = new URLSearchParams({
+      city: trip.destination,
+      country: trip.country ?? "",
+      lat: String(trip.destinationLatitude),
+      lng: String(trip.destinationLongitude),
+    });
+    fetch(`/api/places/destination-photo?${params}`)
+      .then((res) => res.json() as Promise<{ photoUrl?: string | null }>)
+      .then((data) => {
+        if (data.photoUrl) setHeroPhotoUrl(data.photoUrl);
+      })
+      .catch(() => undefined);
+  }, [trip]);
 
   const persist = (next: TripPlan) => {
     setTrip(next);
@@ -157,63 +179,83 @@ export function TripResults({ tripId }: TripResultsProps) {
 
   return (
     <div className="animate-fade-in">
-      <section className="relative border-b border-border">
-        <div className="absolute inset-0 h-48 overflow-hidden">
+      <section>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 pt-6 pb-4">
+          <Link
+            href="/planner"
+            className="inline-flex items-center gap-2 text-sm font-medium text-foreground-secondary hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Plan another trip
+          </Link>
+          <Button variant={saved ? "secondary" : "outline"} size="sm" onClick={handleSave}>
+            {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+            {saved ? "Saved" : "Save"}
+          </Button>
+        </div>
+
+        <div className="relative h-52 sm:h-72 overflow-hidden">
           <Image
-            src={getDestinationImage(trip.destination, 1400)}
+            src={heroPhotoUrl || getHeroDestinationImage(trip.destination)}
             alt={trip.destination}
             fill
-            className="object-cover"
+            unoptimized={isGooglePhotoSrc(heroPhotoUrl)}
+            className="object-cover object-center"
             sizes="100vw"
+            quality={90}
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-background/75 to-background" />
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5"
+            style={{
+              background:
+                "linear-gradient(to top, var(--color-background) 0%, rgba(245,241,232,0.82) 42%, rgba(245,241,232,0) 100%)",
+            }}
+          />
         </div>
-        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-12 pb-10 sm:pt-16">
-          <div className="flex items-center justify-between gap-4 mb-8">
-            <Link href="/planner" className="inline-flex items-center gap-2 text-base text-foreground-secondary hover:text-foreground transition-colors">
-              <ArrowLeft className="h-4 w-4" />
-              Plan another trip
-            </Link>
-            <Button variant={saved ? "secondary" : "outline"} size="sm" onClick={handleSave}>
-              {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-              {saved ? "Saved" : "Save"}
-            </Button>
-          </div>
 
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-3">
-            <span className="text-destination">{trip.destination}</span>
-          </h1>
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-5 pb-2">
           {placeLabel && (
-            <p className="mb-4">
-              {trip.destinationLatitude != null && trip.destinationLongitude != null ? (
-                <a
-                  href={`https://www.openstreetmap.org/?mlat=${trip.destinationLatitude}&mlon=${trip.destinationLongitude}#map=12/${trip.destinationLatitude}/${trip.destinationLongitude}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-base text-foreground-secondary hover:text-primary transition-colors"
-                >
-                  <MapPin className="h-4 w-4" />
-                  {placeLabel}
-                </a>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-base text-foreground-secondary">
-                  <MapPin className="h-4 w-4" />
-                  {placeLabel}
-                </span>
-              )}
-            </p>
+            trip.destinationLatitude != null && trip.destinationLongitude != null ? (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${trip.destinationLatitude},${trip.destinationLongitude}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium uppercase tracking-[0.16em] text-foreground-secondary hover:text-primary transition-colors"
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                {locationSubtitle(trip.destination, placeLabel)}
+              </a>
+            ) : (
+              <p className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium uppercase tracking-[0.16em] text-foreground-secondary">
+                <MapPin className="h-3.5 w-3.5" />
+                {locationSubtitle(trip.destination, placeLabel)}
+              </p>
+            )
           )}
-          <p className="text-base text-muted">
-            {trip.duration} days · {formatCurrency(trip.estimatedBudget)} · {trip.interests.slice(0, 3).join(" · ")}
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-destination leading-[1.1] mb-3">
+            {trip.destination}
+          </h1>
+          <p className="text-lg text-foreground">
+            {[
+              `${trip.duration} days`,
+              trip.dates && trip.dates !== "Flexible dates" ? trip.dates : null,
+              formatCurrency(trip.estimatedBudget),
+              trip.travelStyle,
+              trip.interests.slice(0, 2).join(" & "),
+            ]
+              .filter(Boolean)
+              .join("  ·  ")}
           </p>
           {trip.tripSummary && (
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-foreground-secondary">{trip.tripSummary}</p>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-foreground-secondary">
+              {trip.tripSummary}
+            </p>
           )}
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-8 pb-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: "Trip estimate", value: formatCurrency(totalBudget) },
@@ -225,6 +267,26 @@ export function TripResults({ tripId }: TripResultsProps) {
               <p className="text-sm text-muted mb-1">{item.label}</p>
               <p className="font-medium text-stat truncate">{item.value}</p>
             </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
+        <p className="eyebrow mb-2">Stay</p>
+        <h2 className="text-2xl sm:text-3xl font-bold mb-8">Where to stay</h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {trip.hotelRecommendations.map((hotel) => (
+            <PhotoPlaceCard
+              key={hotel.name}
+              title={hotel.name}
+              photoSrc={hotel.photoUrl || getDestinationImage(trip.destination, 800)}
+              line={[hotel.address || hotel.neighborhood, hotel.priceRange !== "Check current rates" ? hotel.priceRange : ""]
+                .filter(Boolean)
+                .join(" · ")}
+              rating={hotel.rating}
+              reviewCount={hotel.reviewCount}
+              mapsUrl={googlePlacePageUrl(hotel)}
+            />
           ))}
         </div>
       </section>
@@ -244,52 +306,28 @@ export function TripResults({ tripId }: TripResultsProps) {
               </div>
               <div className="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
                 {(["morning", "afternoon", "evening"] as const).map((period) => (
-                  <div key={period} className="p-6 min-h-[12rem]">
-                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted mb-4">
+                  <div key={period} className="p-4 min-h-[16rem]">
+                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted mb-3 px-1">
                       {period}
                     </p>
                     <div className="space-y-4">
                       {day[period].length === 0 && (
-                        <p className="text-base text-muted leading-7">
+                        <p className="px-1 text-base text-muted leading-7">
                           Empty — add something from Recommended Activities.
                         </p>
                       )}
                       {day[period].map((activity: ItineraryActivity, index: number) => (
-                        <div key={`${activity.name}-${index}`} className="group">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-base font-medium leading-7 text-highlight">{activity.name}</p>
-                            <button
-                              type="button"
-                              onClick={() => removeStop(day.day, period, index)}
-                              className="rounded-md p-1 text-muted opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
-                              aria-label={`Remove ${activity.name}`}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                          {activity.address && (
-                            <p className="mt-1 text-sm leading-6 text-muted">{activity.address}</p>
-                          )}
-                          <div className="mt-2 flex flex-wrap items-center gap-3">
-                            {activity.whyRecommended && (
-                              <button
-                                type="button"
-                                onClick={() => setWhyDialog({ title: activity.name, reason: activity.whyRecommended })}
-                                className="text-sm text-primary hover:text-primary-hover"
-                              >
-                                Why this?
-                              </button>
-                            )}
-                            <a
-                              href={googlePlacePageUrl(activity)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-foreground-secondary hover:text-foreground"
-                            >
-                              Open in Google
-                            </a>
-                          </div>
-                        </div>
+                        <ItineraryStopCard
+                          key={`${activity.name}-${index}`}
+                          activity={activity}
+                          photoSrc={
+                            activity.photoUrl ||
+                            resolveStopPhoto(trip, activity) ||
+                            getDestinationImage(trip.destination, 800)
+                          }
+                          onRemove={() => removeStop(day.day, period, index)}
+                          onWhy={() => setWhyDialog({ title: activity.name, reason: activity.whyRecommended })}
+                        />
                       ))}
                     </div>
                   </div>
@@ -347,51 +385,6 @@ export function TripResults({ tripId }: TripResultsProps) {
             ))}
           </div>
         )}
-      </section>
-
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
-        <p className="eyebrow mb-2">Stay</p>
-        <h2 className="text-2xl sm:text-3xl font-bold mb-2">Where to stay</h2>
-        {trip.neighborhoodReason && (
-          <p className="text-base text-foreground-secondary max-w-2xl mb-8 leading-7">{trip.neighborhoodReason}</p>
-        )}
-        <div className="grid sm:grid-cols-3 gap-4 mb-10">
-          {trip.neighborhoods.map((neighborhood, index) => (
-            <Card key={neighborhood.name} className={`p-5 ${index === 0 ? "border-border-accent" : ""}`}>
-              {index === 0 && <Badge className="mb-3">Suggested</Badge>}
-              <h3 className="text-lg font-semibold mb-1">{neighborhood.name}</h3>
-              <p className="text-base text-foreground-secondary leading-7">{neighborhood.bestFor}</p>
-            </Card>
-          ))}
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {trip.hotelRecommendations.map((hotel) => (
-            <Card key={hotel.name} className="overflow-hidden">
-              <PlacePhoto src={hotel.photoUrl || getDestinationImage(trip.destination, 400)} alt={hotel.name} />
-              <CardContent className="p-5">
-                <h3 className="text-lg font-semibold leading-7 mb-1">{hotel.name}</h3>
-                <p className="text-base text-foreground-secondary leading-7 mb-3">
-                  {[hotel.address || hotel.neighborhood, hotel.priceRange !== "Check current rates" ? hotel.priceRange : ""]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                {hotel.rating > 0 && (
-                  <p className="mb-4 inline-flex items-center gap-1 text-sm text-muted">
-                    <Star className="h-3.5 w-3.5" />
-                    {hotel.rating}
-                    {hotel.reviewCount ? ` · ${hotel.reviewCount} reviews` : ""}
-                  </p>
-                )}
-                <a href={googlePlacePageUrl(hotel)} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" size="sm">
-                    Open in Google
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                </a>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
@@ -515,19 +508,138 @@ export function TripResults({ tripId }: TripResultsProps) {
   );
 }
 
-function PlacePhoto({ src, alt }: { src: string; alt: string }) {
+function locationSubtitle(destination: string, label: string): string {
+  const dest = destination.trim();
+  if (label.toLowerCase().startsWith(dest.toLowerCase())) {
+    return label.slice(dest.length).replace(/^,\s*/, "") || label;
+  }
+  return label;
+}
+
+function resolveStopPhoto(trip: TripPlan, stop: ItineraryActivity): string | undefined {
+  const needle = stop.name.toLowerCase().trim();
+  const matchId = stop.providerPlaceId;
+  const lists = [...trip.activities, ...trip.restaurants, ...trip.hotelRecommendations];
+  const match = lists.find((place) => {
+    if (matchId && place.providerPlaceId && place.providerPlaceId === matchId) return true;
+    return place.name.toLowerCase().trim() === needle;
+  });
+  return match?.photoUrl;
+}
+
+function PhotoPlaceCard({
+  title,
+  photoSrc,
+  category,
+  line,
+  rating,
+  reviewCount,
+  mapsUrl,
+  onRemove,
+  onWhy,
+  actions,
+}: {
+  title: string;
+  photoSrc: string;
+  category?: string;
+  line?: string;
+  rating?: number;
+  reviewCount?: number;
+  mapsUrl?: string;
+  onRemove?: () => void;
+  onWhy?: () => void;
+  actions?: ReactNode;
+}) {
   return (
-    <div className="relative h-36 overflow-hidden">
+    <article className="group relative overflow-hidden rounded-[var(--radius-card)] min-h-[20rem] isolate">
       <Image
-        src={src}
-        alt={alt}
+        src={photoSrc}
+        alt={title}
         fill
-        unoptimized={isGooglePhotoSrc(src)}
+        unoptimized={isGooglePhotoSrc(photoSrc)}
         className="object-cover"
         sizes="(max-width: 768px) 100vw, 33vw"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-surface-elevated via-transparent to-transparent" />
-    </div>
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(to top, #ffffff 0%, #ffffff 22%, rgba(255,255,255,0.92) 38%, rgba(255,255,255,0.55) 55%, rgba(255,255,255,0) 78%)",
+        }}
+      />
+      {category && (
+        <Badge variant="secondary" className="absolute top-3 left-3 z-10 bg-white/90 text-sm">
+          {category}
+        </Badge>
+      )}
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute top-2.5 right-2.5 z-10 rounded-md bg-white/90 p-1.5 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-white group-hover:opacity-100"
+          aria-label={`Remove ${title}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <div className="absolute inset-x-0 bottom-0 z-10 p-4">
+        <h3 className="text-lg font-semibold leading-6 text-[#252329]">{title}</h3>
+        {line && <p className="mt-1 text-sm leading-5 text-[#4a4750] line-clamp-2">{line}</p>}
+        {rating != null && rating > 0 && (
+          <p className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-[#252329]">
+            <Star className="h-3.5 w-3.5" />
+            {rating}
+            {reviewCount ? ` · ${reviewCount} reviews` : ""}
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          {actions}
+          {onWhy && (
+            <button
+              type="button"
+              onClick={onWhy}
+              className="text-sm font-medium text-primary hover:text-primary-hover"
+            >
+              Why this?
+            </button>
+          )}
+          {mapsUrl && (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-[#252329] hover:text-primary"
+            >
+              Open in Google
+            </a>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ItineraryStopCard({
+  activity,
+  photoSrc,
+  onRemove,
+  onWhy,
+}: {
+  activity: ItineraryActivity;
+  photoSrc: string;
+  onRemove: () => void;
+  onWhy: () => void;
+}) {
+  return (
+    <PhotoPlaceCard
+      title={activity.name}
+      photoSrc={photoSrc}
+      line={activity.address}
+      rating={activity.rating}
+      mapsUrl={googlePlacePageUrl(activity)}
+      onRemove={onRemove}
+      onWhy={activity.whyRecommended ? onWhy : undefined}
+    />
   );
 }
 
@@ -591,28 +703,15 @@ function RecommendationCard({
   trip: TripPlan;
 }) {
   return (
-    <Card className="overflow-hidden">
-      <PlacePhoto src={photoUrl || fallbackImage} alt={title} />
-      <CardContent className="p-5">
-        {category && <Badge variant="secondary" className="mb-2 text-sm">{category}</Badge>}
-        <h3 className="text-lg font-semibold leading-7 mb-1">{title}</h3>
-        <p className="text-base text-foreground-secondary leading-7 line-clamp-2 mb-3">{line}</p>
-        {rating != null && rating > 0 && (
-          <p className="mb-4 inline-flex items-center gap-1 text-sm text-muted">
-            <Star className="h-3.5 w-3.5" />
-            {rating}
-            {reviewCount ? ` · ${reviewCount} reviews` : ""}
-          </p>
-        )}
-        <div className="flex flex-wrap items-center gap-3">
-          <AddToItineraryButton trip={trip} alreadyAdded={alreadyAdded} onAdd={onAdd} />
-          {mapsUrl && (
-            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground-secondary hover:text-foreground">
-              Open in Google
-            </a>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <PhotoPlaceCard
+      title={title}
+      photoSrc={photoUrl || fallbackImage}
+      category={category}
+      line={line}
+      rating={rating}
+      reviewCount={reviewCount}
+      mapsUrl={mapsUrl}
+      actions={<AddToItineraryButton trip={trip} alreadyAdded={alreadyAdded} onAdd={onAdd} />}
+    />
   );
 }

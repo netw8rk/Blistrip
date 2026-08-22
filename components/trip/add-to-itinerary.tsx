@@ -42,6 +42,7 @@ export function activityToStop(activity: ActivityRecommendation): ItineraryActiv
     provider: activity.provider,
     providerPlaceId: activity.providerPlaceId,
     mapsUrl: activity.mapsUrl,
+    photoUrl: activity.photoUrl,
     source: activity.source === "verified" ? "verified" : "curated",
   };
 }
@@ -59,6 +60,7 @@ export function restaurantToStop(restaurant: RestaurantRecommendation): Itinerar
     provider: restaurant.provider,
     providerPlaceId: restaurant.providerPlaceId,
     mapsUrl: restaurant.mapsUrl,
+    photoUrl: restaurant.photoUrl,
     source: restaurant.source === "verified" ? "verified" : "curated",
   };
 }
