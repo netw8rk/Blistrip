@@ -156,7 +156,7 @@ export function buildOsmQueries(prefs: UserTripPreferences): OsmCategoryQuery[] 
     });
   }
 
-  if (queries.length === 0) {
+  if (!queries.some((query) => ["museums", "historic", "architecture", "attractions"].includes(query.id))) {
     queries.push({
       id: "attractions",
       overpass: `nwr["tourism"="attraction"]["name"]`,
@@ -170,7 +170,7 @@ export function buildOsmQueries(prefs: UserTripPreferences): OsmCategoryQuery[] 
     nominatim: "hotels",
   });
 
-  return queries.slice(0, 7);
+  return queries.slice(0, 8);
 }
 
 export async function retrievePersonalizedPlaces(
@@ -391,18 +391,19 @@ export function buildDraftFromRankedPlaces(
 
   const days = Array.from({ length: prefs.tripLength }, (_, index) => {
     const dayNum = index + 1;
+    const dayWeekday = (weekday + index) % 7;
     const dayItems = dayBuckets[index] ?? [];
     const nightItems = eveningBuckets[index] ?? [];
 
-    const openDay = dayItems.filter((item) => openFor(item, "morning", weekday) || openFor(item, "afternoon", weekday));
-    const morningItem = openDay.find((item) => openFor(item, "morning", weekday)) ?? openDay[0];
+    const openDay = dayItems.filter((item) => openFor(item, "morning", dayWeekday) || openFor(item, "afternoon", dayWeekday));
+    const morningItem = openDay.find((item) => openFor(item, "morning", dayWeekday)) ?? openDay[0];
     const afternoonItems = openDay
-      .filter((item) => item !== morningItem && openFor(item, "afternoon", weekday))
+      .filter((item) => item !== morningItem && openFor(item, "afternoon", dayWeekday))
       .slice(0, afternoonCount);
     const lastAfternoon = afternoonItems[afternoonItems.length - 1] ?? morningItem;
     const eveningItem =
-      nearestOpen(nightItems, lastAfternoon, "evening", weekday) ??
-      nightItems.find((item) => openFor(item, "evening", weekday)) ??
+      nearestOpen(nightItems, lastAfternoon, "evening", dayWeekday) ??
+      nightItems.find((item) => openFor(item, "evening", dayWeekday)) ??
       dayItems[1 + afternoonCount];
 
     if (morningItem) used.add(morningItem.place.id);
@@ -608,7 +609,15 @@ function clusterPlacesForDays(items: RankedPlace[], days: number, maxWalk: numbe
   });
 
   while (clusters.length < days) clusters.push([]);
-  return clusters.slice(0, days);
+  const balanced = clusters.slice(0, days);
+  for (let index = 0; index < balanced.length; index += 1) {
+    while (balanced[index].length === 0) {
+      const donor = balanced.find((cluster) => cluster.length > 2);
+      if (!donor) break;
+      balanced[index].push(donor.pop()!);
+    }
+  }
+  return balanced;
 }
 
 function openFor(item: RankedPlace, slot: DaySlot, weekday: number): boolean {
@@ -740,6 +749,132 @@ function toPlanned(item: RankedPlace, prefs: UserTripPreferences): PlannedActivi
   };
 }
 
+function lodgingType(type: PlaceType | string): boolean {
+  return type === "hotel" || type === "hostel" || type === "apartment";
+}
+
+function toItineraryFiller(item: RankedPlace, prefs: UserTripPreferences): ItineraryActivity {
+  return {
+    name: item.place.name,
+    description: item.place.address ?? item.place.name,
+    whyRecommended: item.reasons[0] ?? `Fits your ${prefs.selectedInterests.slice(0, 2).join(" + ") || "trip"} preferences.`,
+    knowledgeId: item.place.id,
+    type: item.place.type,
+    latitude: item.place.latitude,
+    longitude: item.place.longitude,
+    address: item.place.address,
+    provider: item.place.provider,
+    providerPlaceId: item.place.providerPlaceId,
+    mapsUrl: item.place.mapsUrl,
+    rating: item.place.rating,
+    photoUrl: item.place.photoUrls?.[0],
+    source: "verified",
+  };
+}
+
+function neighborhoodWalk(
+  prefs: UserTripPreferences,
+  slot: DaySlot,
+  near?: Pick<ItineraryActivity, "name" | "latitude" | "longitude" | "neighborhood">
+): ItineraryActivity {
+  const area = near?.name || prefs.destination;
+  const label =
+    slot === "evening"
+      ? `Evening stroll around ${area}`
+      : slot === "morning"
+        ? `Morning walk near ${area}`
+        : `Explore the streets around ${area}`;
+  return {
+    name: label,
+    description: `Free time nearby so the ${slot} stays in ${prefs.destination} instead of going blank.`,
+    whyRecommended: "Keeps the day full without inventing a venue.",
+    type: "experience",
+    neighborhood: near?.neighborhood,
+    latitude: near?.latitude,
+    longitude: near?.longitude,
+    source: "verified",
+  };
+}
+
+function pickOpenUnused(
+  pool: RankedPlace[],
+  used: Set<string>,
+  slot: DaySlot,
+  weekday: number,
+  preferEvening: boolean
+): RankedPlace | undefined {
+  const open = pool.filter((item) => {
+    if (used.has(item.place.id) || lodgingType(item.place.type)) return false;
+    return isOpenDuringSlot(item.place.openingHours, slot, weekday);
+  });
+  const preferred = preferEvening
+    ? open.filter((item) => isEveningType(item.place.type))
+    : open.filter((item) => isDaytimeType(item.place.type));
+  return preferred[0] ?? open[0];
+}
+
+/** Fill every morning / afternoon / evening so no city returns a half-empty day. */
+export function ensureItineraryFilled(
+  plan: Omit<TripPlan, "id" | "createdAt">,
+  retrieval: PlaceRetrievalResult,
+  prefs: UserTripPreferences
+): Omit<TripPlan, "id" | "createdAt"> {
+  const pool = uniquePlaces([
+    ...retrieval.selected,
+    ...retrieval.ranked,
+    ...retrieval.restaurants,
+    ...retrieval.diningAndNightlife,
+  ]);
+  const used = new Set<string>();
+  for (const day of plan.dailyItinerary ?? []) {
+    for (const stop of [...day.morning, ...day.afternoon, ...day.evening]) {
+      if (stop.knowledgeId) used.add(stop.knowledgeId);
+      if (stop.providerPlaceId) used.add(stop.providerPlaceId);
+      const match = pool.find((item) => item.place.name.toLowerCase().trim() === stop.name.toLowerCase().trim());
+      if (match) used.add(match.place.id);
+    }
+  }
+
+  const weekdayBase = prefs.dates?.start ? new Date(`${prefs.dates.start}T12:00:00`).getUTCDay() : 1;
+  const afternoonTarget = prefs.pace === "packed" ? 2 : 1;
+
+  const dailyItinerary = (plan.dailyItinerary ?? []).map((day, index) => {
+    const weekday = (weekdayBase + index) % 7;
+    const morning = [...day.morning];
+    const afternoon = [...day.afternoon];
+    const evening = [...day.evening];
+
+    const take = (slot: DaySlot, preferEvening: boolean) => {
+      const item = pickOpenUnused(pool, used, slot, weekday, preferEvening);
+      if (!item) return null;
+      used.add(item.place.id);
+      return toItineraryFiller(item, prefs);
+    };
+
+    if (morning.length === 0) {
+      morning.push(take("morning", false) ?? neighborhoodWalk(prefs, "morning"));
+    }
+    while (afternoon.length < afternoonTarget) {
+      const next = take("afternoon", false);
+      if (next) {
+        afternoon.push(next);
+        continue;
+      }
+      if (afternoon.length === 0) afternoon.push(neighborhoodWalk(prefs, "afternoon", morning[0]));
+      break;
+    }
+    if (evening.length === 0) {
+      evening.push(
+        take("evening", true) ?? neighborhoodWalk(prefs, "evening", afternoon.at(-1) ?? morning[0])
+      );
+    }
+
+    return { ...day, morning, afternoon, evening };
+  });
+
+  return { ...plan, dailyItinerary };
+}
+
 function isUsablePlace(place: NormalizedPlace): boolean {
   if (!place.name || place.name.length < 2) return false;
   if (!place.providerPlaceId) return false;
@@ -785,7 +920,6 @@ export function constrainItineraryToPool(
   }
 
   const used = new Set<string>();
-  const unused = () => retrieval.selected.filter((item) => !used.has(item.place.id));
 
   const matchActivity = (activity: ItineraryActivity): ItineraryActivity | null => {
     if (activity.type === "experience") return activity;
@@ -818,33 +952,6 @@ export function constrainItineraryToPool(
       afternoon: day.afternoon.map(matchActivity).filter(Boolean) as ItineraryActivity[],
       evening: day.evening.map(matchActivity).filter(Boolean) as ItineraryActivity[],
     };
-    const needed = activitiesPerDay(prefs);
-    const have = slots.morning.length + slots.afternoon.length + slots.evening.length;
-    if (have < Math.min(2, needed)) {
-      for (const item of unused()) {
-        if (slots.morning.length + slots.afternoon.length + slots.evening.length >= needed) break;
-        used.add(item.place.id);
-        const filler: ItineraryActivity = {
-          name: item.place.name,
-          description: item.place.address ?? item.place.name,
-          whyRecommended: item.reasons[0] ?? `Fits your ${prefs.selectedInterests.slice(0, 2).join(" + ")} trip.`,
-          knowledgeId: item.place.id,
-          type: item.place.type,
-          latitude: item.place.latitude,
-          longitude: item.place.longitude,
-          address: item.place.address,
-          provider: item.place.provider,
-          providerPlaceId: item.place.providerPlaceId,
-          mapsUrl: item.place.mapsUrl,
-          rating: item.place.rating,
-          photoUrl: item.place.photoUrls?.[0],
-          source: "verified",
-        };
-        if (slots.morning.length === 0) slots.morning.push(filler);
-        else if (slots.afternoon.length < 2) slots.afternoon.push(filler);
-        else slots.evening.push(filler);
-      }
-    }
     return { ...day, ...slots };
   });
 
@@ -866,17 +973,8 @@ export function constrainItineraryToPool(
     return toActivityRecommendation(item.place, existing?.whyRecommended);
   });
 
-  let verified = 0;
-  let total = 0;
-  for (const day of dailyItinerary) {
-    for (const act of [...day.morning, ...day.afternoon, ...day.evening]) {
-      total += 1;
-      if (act.providerPlaceId && byId.has(act.providerPlaceId)) verified += 1;
-    }
-  }
-
-  return {
-    plan: {
+  const filled = ensureItineraryFilled(
+    {
       ...plan,
       destination: prefs.destination || plan.destination || retrieval.city,
       country: prefs.country || plan.country || retrieval.country,
@@ -889,9 +987,20 @@ export function constrainItineraryToPool(
       restaurants: restaurantRecs,
       activities: activityRecs,
     },
-    verified,
-    total,
-  };
+    retrieval,
+    prefs
+  );
+
+  let verified = 0;
+  let total = 0;
+  for (const day of filled.dailyItinerary) {
+    for (const act of [...day.morning, ...day.afternoon, ...day.evening]) {
+      total += 1;
+      if (act.providerPlaceId && byId.has(act.providerPlaceId)) verified += 1;
+    }
+  }
+
+  return { plan: filled, verified, total };
 }
 
 export function formatRankedPoolForPrompt(result: PlaceRetrievalResult): string {

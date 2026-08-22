@@ -4,6 +4,7 @@ import { validateTripPlan } from "./validator";
 import { validateAgentOutput, removeDuplicateItineraryItems } from "@/lib/ai/validator";
 import {
   constrainItineraryToPool,
+  ensureItineraryFilled,
   type PlaceRetrievalResult,
 } from "@/lib/travel/retrieve-places";
 import type { UserTripPreferences } from "./preferences";
@@ -35,6 +36,7 @@ export function runCriticRepairLoop(
     current = constrained.plan;
     current.dailyItinerary = mergeEmptyDays(current.dailyItinerary, assembledDays);
     current = dropClosedStops(current, retrieval);
+    current = ensureItineraryFilled(current, retrieval, prefs);
 
     const tripCheck = validateTripPlan(
       { ...current, id: "critic", createdAt: new Date().toISOString() },
@@ -55,6 +57,8 @@ export function runCriticRepairLoop(
 
   current = constrainItineraryToPool(current, retrieval, prefs).plan;
   current.dailyItinerary = mergeEmptyDays(current.dailyItinerary, assembledDays);
+  current = dropClosedStops(current, retrieval);
+  current = ensureItineraryFilled(current, retrieval, prefs);
   return { plan: current, attempts, issues, repaired: attempts > 0 };
 }
 

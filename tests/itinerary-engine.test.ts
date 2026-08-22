@@ -195,6 +195,39 @@ async function runTests() {
   assert(criticStops.some((stop) => stop.name === "Mint Museum"), "critic keeps a verified assembled stop");
   assert(!criticStops.some((stop) => stop.name === "Invented Castle"), "critic does not keep a fabricated stop");
 
+  console.log("\nFull-day fill:");
+  const sparse = {
+    ...hallucinated,
+    duration: 3,
+    dailyItinerary: [
+      {
+        day: 1,
+        title: "Day 1",
+        morning: [{ name: "Mint Museum", description: "", whyRecommended: "", providerPlaceId: "n/museum" }],
+        afternoon: [],
+        evening: [],
+      },
+      { day: 2, title: "Day 2", morning: [], afternoon: [], evening: [] },
+      {
+        day: 3,
+        title: "Day 3",
+        morning: [{ name: "Invented Castle", description: "", whyRecommended: "" }],
+        afternoon: [],
+        evening: [],
+      },
+    ],
+  };
+  const filled = constrainItineraryToPool(sparse, retrieval, history.built.prefs).plan;
+  for (const day of filled.dailyItinerary) {
+    assert(day.morning.length > 0, `day ${day.day} morning is filled`);
+    assert(day.afternoon.length > 0, `day ${day.day} afternoon is filled`);
+    assert(day.evening.length > 0, `day ${day.day} evening is filled`);
+  }
+  assert(
+    !filled.dailyItinerary.some((day) => day.morning.some((stop) => stop.name === "Invented Castle")),
+    "fill does not restore fabricated stops"
+  );
+
   console.log(`\n=== RESULTS: ${passed} passed, ${failed} failed ===\n`);
   process.exit(failed > 0 ? 1 : 0);
 }

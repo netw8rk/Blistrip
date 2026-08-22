@@ -64,7 +64,7 @@ export function buildSearchRequirements(profile: SearchableProfile | TripProfile
     });
   }
 
-  if (requirements.length === 0) {
+  if (!requirements.some((item) => ["attractions", "historic", "museums", "architecture"].includes(item.id))) {
     requirements.push({
       id: "attractions",
       category: "attraction",
@@ -84,9 +84,13 @@ export function buildSearchRequirements(profile: SearchableProfile | TripProfile
     slot: "any",
   });
 
-  return requirements
-    .sort((a, b) => b.priority - a.priority)
-    .slice(0, 7);
+  const required = new Set(["hotels", "attractions", "historic", "museums"]);
+  const ranked = [...requirements].sort((a, b) => b.priority - a.priority);
+  const kept: SearchRequirement[] = [];
+  for (const item of ranked) {
+    if (kept.length < 8 || required.has(item.id)) kept.push(item);
+  }
+  return kept;
 }
 
 export function formatSearchRequirementsLog(requirements: SearchRequirement[]): string {
