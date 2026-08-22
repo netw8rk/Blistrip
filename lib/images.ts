@@ -62,6 +62,38 @@ export function getHeroDestinationImage(destination: string): string {
   return getDestinationImage(destination, 2400);
 }
 
+const PLACE_FALLBACK_PHOTOS = [
+  PHOTOS.europeStreet,
+  PHOTOS.travelersExploring,
+  PHOTOS.travelersEnjoying,
+  PHOTOS.ctaMountains,
+  PHOTOS.travelersPlanning,
+  "1469854523086-cc02fe5d8800",
+  "1551882547-ff40c63ea4d4",
+  "1414235077428-338989a2e8c0",
+  "1517248135467-4c7edcad34c4",
+  "1441974231531-c6227db76b6e",
+  "1507525428034-b723cf961d3e",
+  "1515542622106-78bda8ba0e5b",
+  "1466978913421-dad2ebb25d34",
+  "1523906834658-6e24cd238f8b",
+] as const;
+
+function hashSeed(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+/** Distinct stock photo per place so unknown cities don't reuse one image on every card. */
+export function getPlaceFallbackImage(placeName: string, destination?: string, width = 800): string {
+  const seed = `${placeName.trim().toLowerCase()}|${(destination ?? "").trim().toLowerCase()}`;
+  const photoId = PLACE_FALLBACK_PHOTOS[hashSeed(seed) % PLACE_FALLBACK_PHOTOS.length];
+  return getImageUrl(photoId, width);
+}
+
 export const popularDestinations = [
   { name: "Prague", country: "Czech Republic", photoId: PHOTOS.prague },
   { name: "Budapest", country: "Hungary", photoId: PHOTOS.budapest },

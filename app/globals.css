@@ -35,6 +35,20 @@
   --font-sub: var(--font-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --radius-card: 12px;
   --radius-button: 8px;
+
+  --text-xs: calc(0.75rem + 1pt);
+  --text-sm: calc(0.875rem + 1pt);
+  --text-base: calc(1rem + 1pt);
+  --text-lg: calc(1.125rem + 1pt);
+  --text-xl: calc(1.25rem + 1pt);
+  --text-2xl: calc(1.5rem + 1pt);
+  --text-3xl: calc(1.875rem + 1pt);
+  --text-4xl: calc(2.25rem + 1pt);
+  --text-5xl: calc(3rem + 1pt);
+  --text-6xl: calc(3.75rem + 1pt);
+  --text-7xl: calc(4.5rem + 1pt);
+  --text-8xl: calc(6rem + 1pt);
+  --text-9xl: calc(8rem + 1pt);
 }
 
 @layer base {
@@ -47,7 +61,7 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased font-sans;
+    @apply bg-background text-base text-foreground antialiased font-sans;
   }
 
   h1,
@@ -100,11 +114,11 @@
   }
 
   .eyebrow {
-    @apply text-[11px] font-medium uppercase tracking-[0.1em] text-primary font-sub;
+    @apply text-[12px] font-medium uppercase tracking-[0.1em] text-primary font-sub;
   }
 
   .subcontainer-title {
-    @apply text-[15px] lg:text-base font-semibold text-foreground leading-snug;
+    @apply text-[16px] lg:text-base font-semibold text-foreground leading-snug;
   }
 
   .subcontainer-body {
@@ -112,7 +126,7 @@
   }
 
   .subcontainer-meta {
-    @apply text-[11px] font-semibold tracking-[0.15em] text-primary;
+    @apply text-[12px] font-semibold tracking-[0.15em] text-primary;
   }
 
   .subcontainer-link {

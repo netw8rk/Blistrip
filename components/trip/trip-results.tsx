@@ -29,7 +29,7 @@ import {
   setActiveTrip,
 } from "@/lib/storage";
 import type { ActivityRecommendation, ItineraryActivity, TripPlan } from "@/types/trip";
-import { getDestinationImage, getHeroDestinationImage } from "@/lib/images";
+import { getHeroDestinationImage, getPlaceFallbackImage } from "@/lib/images";
 import { googlePlacePageUrl, isGooglePhotoSrc } from "@/lib/travel/google-links";
 import { TripRefinePanel } from "@/components/trip/trip-refine-panel";
 import {
@@ -180,7 +180,7 @@ export function TripResults({ tripId }: TripResultsProps) {
   return (
     <div className="animate-fade-in">
       <section>
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 pt-6 pb-4">
+        <div className="mx-auto flex max-w-[90rem] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 pt-6 pb-4">
           <Link
             href="/planner"
             className="inline-flex items-center gap-2 text-sm font-medium text-foreground-secondary hover:text-foreground"
@@ -214,7 +214,7 @@ export function TripResults({ tripId }: TripResultsProps) {
           />
         </div>
 
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-5 pb-2">
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 pt-5 pb-2">
           {placeLabel && (
             trip.destinationLatitude != null && trip.destinationLongitude != null ? (
               <a
@@ -255,7 +255,7 @@ export function TripResults({ tripId }: TripResultsProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-8 pb-8">
+      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 pt-8 pb-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: "Trip estimate", value: formatCurrency(totalBudget) },
@@ -271,7 +271,7 @@ export function TripResults({ tripId }: TripResultsProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
+      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
         <p className="eyebrow mb-2">Stay</p>
         <h2 className="text-2xl sm:text-3xl font-bold mb-8">Where to stay</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -279,7 +279,7 @@ export function TripResults({ tripId }: TripResultsProps) {
             <PhotoPlaceCard
               key={hotel.name}
               title={hotel.name}
-              photoSrc={hotel.photoUrl || getDestinationImage(trip.destination, 800)}
+              photoSrc={hotel.photoUrl || getPlaceFallbackImage(hotel.name, trip.destination, 800)}
               line={[hotel.address || hotel.neighborhood, hotel.priceRange !== "Check current rates" ? hotel.priceRange : ""]
                 .filter(Boolean)
                 .join(" · ")}
@@ -291,7 +291,7 @@ export function TripResults({ tripId }: TripResultsProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10 border-t border-border">
+      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-10 border-t border-border">
         <p className="eyebrow mb-2">Itinerary</p>
         <h2 className="text-2xl sm:text-3xl font-bold mb-2">Day by day</h2>
         <p className="text-base text-muted mb-8">Add or remove stops anytime from the lists below.</p>
@@ -323,7 +323,7 @@ export function TripResults({ tripId }: TripResultsProps) {
                           photoSrc={
                             activity.photoUrl ||
                             resolveStopPhoto(trip, activity) ||
-                            getDestinationImage(trip.destination, 800)
+                            getPlaceFallbackImage(activity.name, trip.destination, 800)
                           }
                           onRemove={() => removeStop(day.day, period, index)}
                           onWhy={() => setWhyDialog({ title: activity.name, reason: activity.whyRecommended })}
@@ -338,7 +338,7 @@ export function TripResults({ tripId }: TripResultsProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
+      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
         <p className="eyebrow mb-2">More options</p>
         <h2 className="text-2xl sm:text-3xl font-bold mb-2">Recommended Activities</h2>
         <p className="text-base text-muted mb-6">Places you can add to any day.</p>
@@ -376,7 +376,7 @@ export function TripResults({ tripId }: TripResultsProps) {
                 rating={activity.rating}
                 reviewCount={activity.reviewCount}
                 photoUrl={activity.photoUrl}
-                fallbackImage={getDestinationImage(trip.destination, 400)}
+                fallbackImage={getPlaceFallbackImage(activity.name, trip.destination, 400)}
                 mapsUrl={googlePlacePageUrl(activity)}
                 alreadyAdded={placeAlreadyOnTrip(trip, activity.name, activity.providerPlaceId)}
                 onAdd={(day, slot) => addRecommendation(activityToStop(activity), day, slot)}
@@ -387,7 +387,7 @@ export function TripResults({ tripId }: TripResultsProps) {
         )}
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
+      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
         <p className="eyebrow mb-2">Dining</p>
         <h2 className="text-2xl sm:text-3xl font-bold mb-2">Where to eat</h2>
         <p className="text-base text-muted mb-8">Add a restaurant to dinner or any other slot.</p>
@@ -402,7 +402,7 @@ export function TripResults({ tripId }: TripResultsProps) {
               rating={restaurant.rating}
               reviewCount={restaurant.reviewCount}
               photoUrl={restaurant.photoUrl}
-              fallbackImage={getDestinationImage(trip.destination, 400)}
+              fallbackImage={getPlaceFallbackImage(restaurant.name, trip.destination, 400)}
               mapsUrl={googlePlacePageUrl(restaurant)}
               alreadyAdded={placeAlreadyOnTrip(trip, restaurant.name, restaurant.providerPlaceId)}
               onAdd={(day, slot) => addRecommendation(restaurantToStop(restaurant), day, slot)}
@@ -412,7 +412,7 @@ export function TripResults({ tripId }: TripResultsProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
+      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
         <p className="eyebrow mb-2">Budget</p>
         <h2 className="text-2xl font-bold mb-2">Estimate</h2>
         <p className="text-base text-muted mb-6">Planning figures only — not live prices.</p>
@@ -431,7 +431,7 @@ export function TripResults({ tripId }: TripResultsProps) {
         </Card>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10 border-t border-border pb-16">
+      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-10 border-t border-border pb-16">
         <button
           type="button"
           onClick={() => setShowExtras((value) => !value)}

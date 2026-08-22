@@ -42,7 +42,15 @@ const TRAVELER_COUNT: Record<string, number> = {
 
 export function buildTripProfile(
   input: TripPlannerInput,
-  resolved?: { destination?: string; country?: string; tripLength?: number; dislikes?: string[] }
+  resolved?: {
+    destination?: string;
+    country?: string;
+    tripLength?: number;
+    dislikes?: string[];
+    latitude?: number;
+    longitude?: number;
+    label?: string;
+  }
 ): TripProfile {
   const prefs = buildUserPreferences(input, resolved);
   const notes = [input.additionalNotes, input.destinationDescription].filter(Boolean).join(" ");

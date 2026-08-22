@@ -33,11 +33,11 @@ function SectionHeader({
         <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-primary/60" />
         <span aria-hidden className="h-px w-10 bg-gradient-to-l from-transparent to-primary/45" />
       </div>
-      <h2 className="text-2xl sm:text-3xl lg:text-[2rem] font-semibold tracking-tight text-foreground leading-[1.15]">
+      <h2 className="text-2xl sm:text-3xl lg:text-[calc(2rem+1pt)] font-semibold tracking-tight text-foreground leading-[1.15]">
         {title}
       </h2>
       {subtitle ? (
-        <p className="mt-3 text-sm sm:text-[15px] text-foreground-secondary leading-relaxed">
+        <p className="mt-3 text-sm sm:text-[16px] text-foreground-secondary leading-relaxed">
           {subtitle}
         </p>
       ) : null}
@@ -48,7 +48,7 @@ function SectionHeader({
 export function HeroSection() {
   return (
     <section className="section-base">
-      <div className="mx-auto max-w-[83rem] px-4 sm:px-5 lg:px-6 py-6 lg:py-8">
+      <div className="mx-auto max-w-[86rem] px-4 sm:px-5 lg:px-6 py-6 lg:py-8">
         <div className="relative overflow-hidden rounded-2xl border border-border shadow-sm animate-slide-up min-h-[520px] sm:min-h-[540px] lg:min-h-[580px] max-h-[680px]">
           <Image
             src={images.hero}
@@ -56,7 +56,7 @@ export function HeroSection() {
             fill
             className="object-cover object-[65%_center] sm:object-[70%_center]"
             priority
-            sizes="(max-width: 1328px) 100vw, 1328px"
+            sizes="(max-width: 1376px) 100vw, 1376px"
           />
 
           {/* Left scrim — localized fade, not a full-card wash */}
@@ -74,7 +74,7 @@ export function HeroSection() {
             className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background/25 to-transparent sm:hidden"
           />
 
-          <span className="absolute left-5 top-5 z-20 inline-flex w-fit items-center gap-1.5 rounded-full border border-border/80 bg-surface/75 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur-md sm:left-6 sm:top-6 sm:text-[13px] lg:left-8 lg:top-8">
+          <span className="absolute left-5 top-5 z-20 inline-flex w-fit items-center gap-1.5 rounded-full border border-border/80 bg-surface/75 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur-md sm:left-6 sm:top-6 sm:text-[14px] lg:left-8 lg:top-8">
             <Sparkles className="h-3.5 w-3.5 text-foreground" />
             AI-powered travel planning
           </span>
@@ -100,7 +100,7 @@ export function HeroSection() {
                 ].map((stat) => (
                   <div key={stat.label}>
                     <p className="text-base sm:text-lg font-semibold text-foreground tabular-nums">{stat.value}</p>
-                    <p className="text-[10px] sm:text-[11px] text-muted mt-0.5">{stat.label}</p>
+                    <p className="text-[11px] sm:text-[12px] text-muted mt-0.5">{stat.label}</p>
                   </div>
                 ))}
               </div>
@@ -161,7 +161,7 @@ function QuickPlanChip({ icon: Icon, label }: { icon: React.ElementType; label: 
 export function DestinationStripSection() {
   return (
     <section className="py-14 section-raised border-t border-border">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[84rem] px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="section-title">Popular Destinations</h2>
           <Link href="/explore" className="subcontainer-link flex items-center gap-1">
@@ -201,7 +201,7 @@ export function HowItWorksSection() {
 
   return (
     <section className="py-10 lg:py-12 section-alt border-t border-border">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[84rem] px-4 sm:px-6 lg:px-8">
         <SectionHeader title="How Blistrip Works" />
 
         <div className="grid md:grid-cols-3 gap-4 lg:gap-5">
@@ -219,12 +219,12 @@ export function HowItWorksSection() {
                   aria-hidden
                   className="absolute inset-0 bg-gradient-to-t from-foreground/35 via-transparent to-transparent"
                 />
-                <span className="absolute top-3 left-3 inline-flex items-center rounded-full border border-white/30 bg-background/85 px-2.5 py-1 text-[11px] font-semibold tracking-[0.12em] text-foreground backdrop-blur-sm">
+                <span className="absolute top-3 left-3 inline-flex items-center rounded-full border border-white/30 bg-background/85 px-2.5 py-1 text-[12px] font-semibold tracking-[0.12em] text-foreground backdrop-blur-sm">
                   {step.step}
                 </span>
               </div>
               <h3 className="subcontainer-title mb-1">{step.title}</h3>
-              <p className="subcontainer-body text-[13px] leading-snug">{step.description}</p>
+              <p className="subcontainer-body text-[14px] leading-snug">{step.description}</p>
             </div>
           ))}
         </div>
@@ -265,9 +265,9 @@ export function WhyBlistripSection() {
 
   return (
     <section className="border-t border-border bg-background py-10 lg:py-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[84rem] px-4 sm:px-6 lg:px-8">
         <div className="mb-8 max-w-xl lg:mb-9">
-          <p className="mb-3 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[13px]">
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[14px]">
             Why Blistrip
           </p>
           <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl leading-[1.15]">
@@ -288,7 +288,7 @@ export function WhyBlistripSection() {
                   aria-hidden
                 />
                 <h3 className="subcontainer-title mb-1.5">{feature.title}</h3>
-                <p className="subcontainer-body max-w-[16rem] text-[13px] leading-snug">
+                <p className="subcontainer-body max-w-[16rem] text-[14px] leading-snug">
                   {feature.description}
                 </p>
               </div>
@@ -305,10 +305,10 @@ export function ExampleTripSection() {
 
   return (
     <section className="py-20 section-alt border-t border-border">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[84rem] px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-start">
           <div>
-            <p className="mb-3 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[13px]">
+            <p className="mb-3 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[14px]">
               Example Trip
             </p>
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
@@ -366,7 +366,7 @@ export function ExampleTripSection() {
 export function CTASection() {
   return (
     <section className="py-10 section-raised border-t border-border">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[84rem] px-4 sm:px-6 lg:px-8">
         <div className="overflow-hidden rounded-xl border border-border bg-surface flex flex-col sm:flex-row">
           <div className="relative h-32 sm:h-auto sm:w-44 md:w-52 shrink-0">
             <Image

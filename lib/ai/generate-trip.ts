@@ -21,8 +21,9 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
   const { context, retrieved, budgetEstimate } = pipeline;
 
   const confirmed = getConfirmedDestination(input);
-  const city = confirmed?.city || retrieved?.destination?.city || context.destination || "";
-  const country = confirmed?.country || retrieved?.destination?.country;
+  const discovered = retrieved?.destination;
+  const city = confirmed?.city || discovered?.city || context.destination || "";
+  const country = confirmed?.country || discovered?.country;
 
   const startedAt = Date.now();
   const profile = buildTripProfile(input, {
@@ -30,6 +31,11 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
     country,
     tripLength: context.tripLength,
     dislikes: context.dislikes,
+    latitude: confirmed?.latitude ?? discovered?.latitude,
+    longitude: confirmed?.longitude ?? discovered?.longitude,
+    label:
+      confirmed?.label ||
+      (discovered ? [discovered.city, discovered.country].filter(Boolean).join(", ") : undefined),
   });
   const prefs = profile.prefs;
   const requirements = buildSearchRequirements(profile);

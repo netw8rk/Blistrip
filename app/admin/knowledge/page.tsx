@@ -120,7 +120,7 @@ function DestinationRow({
         {destination.travelStyles.slice(0, 6).map((style) => (
           <span
             key={style}
-            className="inline-block rounded-full bg-primary-muted px-2 py-0.5 text-[10px] text-primary"
+            className="inline-block rounded-full bg-primary-muted px-2 py-0.5 text-[11px] text-primary"
           >
             {style}
           </span>

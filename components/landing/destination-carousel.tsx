@@ -107,8 +107,8 @@ export function DestinationCarousel() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
               <div className="absolute bottom-3 left-3 right-3">
-                <p className="text-[15px] font-semibold text-white leading-snug drop-shadow-sm">{dest.name}</p>
-                <p className="text-[11px] text-white/75 mt-0.5">{dest.country}</p>
+                <p className="text-[16px] font-semibold text-white leading-snug drop-shadow-sm">{dest.name}</p>
+                <p className="text-[12px] text-white/75 mt-0.5">{dest.country}</p>
               </div>
             </div>
           </Link>

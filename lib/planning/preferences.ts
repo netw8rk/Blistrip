@@ -65,7 +65,15 @@ const PACE_MAP: Record<string, UserTripPreferences["pace"]> = {
 
 export function buildUserPreferences(
   input: TripPlannerInput,
-  resolved?: { destination?: string; country?: string; tripLength?: number; dislikes?: string[] }
+  resolved?: {
+    destination?: string;
+    country?: string;
+    tripLength?: number;
+    dislikes?: string[];
+    latitude?: number;
+    longitude?: number;
+    label?: string;
+  }
 ): UserTripPreferences {
   const selected = input.interests.map((i) => i.toLowerCase());
   const notes = [input.additionalNotes, input.destinationDescription].filter(Boolean).join(" ");
@@ -104,10 +112,10 @@ export function buildUserPreferences(
   return {
     destination: input.destination || resolved?.destination || "",
     country: input.destinationCountry || resolved?.country,
-    destinationLabel: input.destinationLabel,
-    state: input.destinationState || parseRegionFromLabel(input.destinationLabel).state,
-    latitude: input.destinationLatitude,
-    longitude: input.destinationLongitude,
+    destinationLabel: input.destinationLabel || resolved?.label,
+    state: input.destinationState || parseRegionFromLabel(input.destinationLabel || resolved?.label).state,
+    latitude: input.destinationLatitude ?? resolved?.latitude,
+    longitude: input.destinationLongitude ?? resolved?.longitude,
     dates:
       input.startDate && input.endDate
         ? { start: input.startDate, end: input.endDate }

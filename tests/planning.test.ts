@@ -81,6 +81,20 @@ async function runTests() {
   if (pipeline2.budgetEstimate) {
     assert(pipeline2.budgetEstimate.total > 0, "Budget estimate is positive");
   }
+  const discovered = pipeline2.retrieved?.destination;
+  if (discovered) {
+    const { buildUserPreferences } = await import("../lib/planning/preferences");
+    const discoveryPrefs = buildUserPreferences(discoveryInput, {
+      destination: discovered.city,
+      country: discovered.country,
+      latitude: discovered.latitude,
+      longitude: discovered.longitude,
+      label: `${discovered.city}, ${discovered.country}`,
+    });
+    assert(discoveryPrefs.latitude === discovered.latitude, "Discovery trip profile keeps city latitude");
+    assert(discoveryPrefs.longitude === discovered.longitude, "Discovery trip profile keeps city longitude");
+    assert(discoveryPrefs.destination === discovered.city, "Discovery trip profile uses the matched city");
+  }
 
   // TEST 3: Hate museums
   console.log("\nTEST 3: Museum dislike filtering");

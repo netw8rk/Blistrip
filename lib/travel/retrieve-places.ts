@@ -179,21 +179,42 @@ export async function retrievePersonalizedPlaces(
   const queries = buildOsmQueries(prefs);
   const requirements = buildSearchRequirements(prefs);
   const searches = requirements.map((item) => item.id);
+  let workingPrefs = prefs;
   const origin =
-    prefs.latitude != null && prefs.longitude != null
-      ? { lat: prefs.latitude, lon: prefs.longitude }
+    workingPrefs.latitude != null && workingPrefs.longitude != null
+      ? { lat: workingPrefs.latitude, lon: workingPrefs.longitude }
       : null;
 
-  const [googlePlaces, osmRaw, heroPlaces] = await Promise.all([
-    searchGoogleRequirements(prefs, requirements),
-    osm.searchByQueries(
-      prefs.destination,
-      prefs.country,
-      queries,
-      origin ? { lat: origin.lat, lon: origin.lon, state: prefs.state } : undefined
-    ),
-    searchDestinationHeroPlaces(prefs),
-  ]);
+  let googlePlaces: NormalizedPlace[] = [];
+  let heroPlaces: NormalizedPlace[] = [];
+  let osmRaw: Awaited<ReturnType<typeof osm.searchByQueries>> = null;
+
+  if (origin) {
+    [googlePlaces, osmRaw, heroPlaces] = await Promise.all([
+      searchGoogleRequirements(workingPrefs, requirements),
+      osm.searchByQueries(
+        workingPrefs.destination,
+        workingPrefs.country,
+        queries,
+        { lat: origin.lat, lon: origin.lon, state: workingPrefs.state }
+      ),
+      searchDestinationHeroPlaces(workingPrefs),
+    ]);
+  } else {
+    osmRaw = await osm.searchByQueries(workingPrefs.destination, workingPrefs.country, queries);
+    if (osmRaw && google.isConfigured()) {
+      workingPrefs = {
+        ...workingPrefs,
+        latitude: osmRaw.latitude,
+        longitude: osmRaw.longitude,
+        country: workingPrefs.country || osmRaw.country,
+      };
+      [googlePlaces, heroPlaces] = await Promise.all([
+        searchGoogleRequirements(workingPrefs, requirements),
+        searchDestinationHeroPlaces(workingPrefs),
+      ]);
+    }
+  }
 
   const providers = [
     googlePlaces.length ? "google_places" : "",
@@ -204,16 +225,18 @@ export async function retrievePersonalizedPlaces(
   if (merged.length === 0) return null;
 
   const retrievedCount = merged.length;
-  const center = origin ??
-    (osmRaw?.latitude != null && osmRaw.longitude != null
-      ? { lat: osmRaw.latitude, lon: osmRaw.longitude }
-      : null);
+  const center =
+    workingPrefs.latitude != null && workingPrefs.longitude != null
+      ? { lat: workingPrefs.latitude, lon: workingPrefs.longitude }
+      : osmRaw?.latitude != null && osmRaw.longitude != null
+        ? { lat: osmRaw.latitude, lon: osmRaw.longitude }
+        : null;
   const filtered = merged.filter((place) => {
     if (!isUsablePlace(place)) return false;
     if (!center || place.latitude == null || place.longitude == null) return false;
     return isWithinRadiusKm(place.latitude, place.longitude, center.lat, center.lon, DESTINATION_MATCH_KM);
   });
-  const ranked = rankPlaces(filtered, prefs);
+  const ranked = rankPlaces(filtered, workingPrefs);
   const hotels = ranked.filter((r) => r.place.type === "hotel" || r.place.type === "hostel");
   const restaurants = ranked.filter((r) =>
     ["restaurant", "cafe", "market"].includes(r.place.type)
@@ -249,10 +272,10 @@ export async function retrievePersonalizedPlaces(
   }
 
   return {
-    city: prefs.destination || osmRaw?.city || "",
-    country: prefs.country || osmRaw?.country || "",
-    latitude: prefs.latitude ?? osmRaw?.latitude,
-    longitude: prefs.longitude ?? osmRaw?.longitude,
+    city: workingPrefs.destination || osmRaw?.city || "",
+    country: workingPrefs.country || osmRaw?.country || "",
+    latitude: workingPrefs.latitude ?? osmRaw?.latitude,
+    longitude: workingPrefs.longitude ?? osmRaw?.longitude,
     searches,
     providers,
     retrievedCount,
@@ -925,9 +948,9 @@ export function buildPlanFromRetrieval(
     tripSummary: `A ${prefs.tripLength}-day ${prefs.travelStyle.toLowerCase()} trip to ${prefs.destinationLabel || prefs.destination || retrieval.city} shaped around ${prefs.selectedInterests.slice(0, 3).join(", ").toLowerCase() || "your preferences"}.`,
     destination: prefs.destination || retrieval.city,
     country: prefs.country || retrieval.country,
-    destinationLabel: prefs.destinationLabel,
-    destinationLatitude: prefs.latitude,
-    destinationLongitude: prefs.longitude,
+    destinationLabel: prefs.destinationLabel || [prefs.destination || retrieval.city, prefs.country || retrieval.country].filter(Boolean).join(", "),
+    destinationLatitude: prefs.latitude ?? retrieval.latitude,
+    destinationLongitude: prefs.longitude ?? retrieval.longitude,
     destinationPhotoUrl: retrieval.destinationPhotoUrl,
     dates: prefs.dates ? `${prefs.dates.start} – ${prefs.dates.end}` : "Flexible dates",
     duration: prefs.tripLength,
