@@ -140,11 +140,12 @@ export function toHotelRecommendation(place: NormalizedHotel, why?: string): Hot
     name: place.name,
     description: place.address
       ? `${place.address}`
-      : `Verified ${place.type} in ${place.city}.`,
-    priceRange: "Check current rates",
+      : `${titleCase(place.type)} in ${place.city}.`,
+    priceRange: formatPriceLevel(place.priceLevel) ?? "Check current rates",
     whyRecommended:
-      why ?? `A real ${place.type} listed in ${place.city}${place.address ? ` at ${place.address}` : ""}.`,
+      why ?? `${titleCase(place.type)} in ${place.city}${place.address ? ` at ${place.address}` : ""}.`,
     rating: place.rating ?? 0,
+    reviewCount: place.reviewCount,
     bookingUrl: place.bookingUrl || place.mapsUrl || "",
     neighborhood: place.neighborhood,
     provider: place.provider,
@@ -154,6 +155,7 @@ export function toHotelRecommendation(place: NormalizedHotel, why?: string): Hot
     longitude: place.longitude,
     mapsUrl: place.mapsUrl,
     website: place.website,
+    photoUrl: place.photoUrls?.[0],
     source: "verified",
   };
 }
@@ -169,7 +171,7 @@ export function toRestaurantRecommendation(
     cuisine: formatCuisine(place.category) || titleCase(place.type),
     priceRange: place.priceLevel ? "$".repeat(Math.min(place.priceLevel, 4)) : "–",
     whyRecommended:
-      why ?? `Verified ${place.type} in ${place.city}${place.address ? ` · ${place.address}` : ""}.`,
+      why ?? `${titleCase(place.type)} in ${place.city}${place.address ? ` · ${place.address}` : ""}.`,
     location: place.address || place.city,
     category,
     bookingUrl: place.mapsUrl || place.website || "",
@@ -182,6 +184,7 @@ export function toRestaurantRecommendation(
     reviewCount: place.reviewCount,
     mapsUrl: place.mapsUrl,
     website: place.website,
+    photoUrl: place.photoUrls?.[0],
     source: "verified",
   };
 }
@@ -189,10 +192,10 @@ export function toRestaurantRecommendation(
 export function toActivityRecommendation(place: NormalizedPlace, why?: string): ActivityRecommendation {
   return {
     name: place.name,
-    description: place.address ? place.address : `Verified ${place.type} in ${place.city}.`,
-    price: "Check locally",
+    description: place.address ? place.address : `${titleCase(place.type)} in ${place.city}.`,
+    price: formatPriceLevel(place.priceLevel) ?? "Check locally",
     duration: place.type === "museum" ? "1–2 hours" : "1–3 hours",
-    whyRecommended: why ?? `A real ${place.type} in ${place.city} from verified map data.`,
+    whyRecommended: why ?? `${titleCase(place.type)} in ${place.city}${place.address ? ` · ${place.address}` : ""}.`,
     bookingUrl: place.mapsUrl || place.website || "",
     category: titleCase(place.type),
     provider: place.provider,
@@ -204,6 +207,7 @@ export function toActivityRecommendation(place: NormalizedPlace, why?: string): 
     reviewCount: place.reviewCount,
     mapsUrl: place.mapsUrl,
     website: place.website,
+    photoUrl: place.photoUrls?.[0],
     source: "verified",
   };
 }
@@ -256,7 +260,7 @@ export function buildDraftFromVerifiedPlaces(
     pace,
     days,
     selectedAttractionIds: unique.map((p) => p.id),
-    geographicNotes: ["Stops grouped from verified map listings in the requested city."],
+    geographicNotes: [`Stops grouped so nearby places in ${verified.city} stay on the same day.`],
   };
 }
 
@@ -265,13 +269,13 @@ function toPlanned(place: NormalizedPlace, slot: string): PlannedActivity {
     id: place.id,
     name: place.name,
     type: place.type,
-    description: place.address ?? `Verified ${place.type} in ${place.city}`,
+    description: place.address ?? `${titleCase(place.type)} in ${place.city}`,
     neighborhood: place.address,
     latitude: place.latitude,
     longitude: place.longitude,
     durationMinutes: place.type === "museum" ? 90 : 75,
     estimatedCostLevel: "check locally",
-    reason: `Verified ${place.type} in ${place.city} for a ${slot} stop.`,
+    reason: `${titleCase(place.type)} in ${place.city} for a ${slot} stop.`,
     reservationRecommended: place.type === "restaurant",
     source: "verified",
   };
@@ -322,4 +326,10 @@ function formatCuisine(value?: string): string {
 
 function titleCase(value: string): string {
   return value.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatPriceLevel(level?: number): string | undefined {
+  if (level == null) return undefined;
+  if (level === 0) return "Free";
+  return "$".repeat(Math.min(level, 4));
 }

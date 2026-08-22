@@ -35,7 +35,7 @@ export function BudgetBar({ label, amount, total, color = "bg-primary" }: Budget
   const percentage = total > 0 ? (amount / total) * 100 : 0;
   return (
     <div className="space-y-2">
-      <div className="flex justify-between text-sm">
+      <div className="flex justify-between text-base">
         <span className="text-foreground-secondary">{label}</span>
         <span className="font-medium">${amount.toLocaleString()}</span>
       </div>

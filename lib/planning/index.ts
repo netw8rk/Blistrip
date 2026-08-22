@@ -16,6 +16,10 @@ export type {
 
 export { buildEnhancedPlanningContext, inferPlanningMode } from "./context";
 export { buildUserPreferences, formatPreferencesLog, activitiesPerDay } from "./preferences";
+export { buildTripProfile, formatTripProfileLog } from "./trip-profile";
+export { buildSearchRequirements, formatSearchRequirementsLog } from "./search-requirements";
+export { SCORING_WEIGHTS } from "./scoring-weights";
+export { runCriticRepairLoop } from "./critic";
 export { rankAttractions, rankTopActivities, scoreAttraction } from "./ranking";
 export { haversineKm, parseDurationMinutes, estimateWalkMinutes, orderByProximity } from "./geo";
 export { buildStructuredItinerary } from "./scheduler";

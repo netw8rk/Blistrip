@@ -1,11 +1,12 @@
 import type { TripPlannerInput, TripPlan } from "@/types/trip";
 import { generateMockTrip, enrichTripPlan } from "@/lib/mock-data";
 import { runPlanningPipeline, estimateTripBudget } from "@/lib/planning";
-import { buildUserPreferences, formatPreferencesLog } from "@/lib/planning/preferences";
+import { buildTripProfile, formatTripProfileLog } from "@/lib/planning/trip-profile";
+import { buildSearchRequirements, formatSearchRequirementsLog } from "@/lib/planning/search-requirements";
+import { runCriticRepairLoop } from "@/lib/planning/critic";
 import {
   buildDraftFromRankedPlaces,
   buildPlanFromRetrieval,
-  constrainItineraryToPool,
   formatRetrievalLog,
   retrievePersonalizedPlaces,
 } from "@/lib/travel/retrieve-places";
@@ -23,15 +24,19 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
   const city = confirmed?.city || retrieved?.destination?.city || context.destination || "";
   const country = confirmed?.country || retrieved?.destination?.country;
 
-  const prefs = buildUserPreferences(input, {
+  const startedAt = Date.now();
+  const profile = buildTripProfile(input, {
     destination: city,
     country,
     tripLength: context.tripLength,
     dislikes: context.dislikes,
   });
+  const prefs = profile.prefs;
+  const requirements = buildSearchRequirements(profile);
 
   console.log("\n========== BLISTRIP PLANNING PIPELINE ==========");
-  console.log(formatPreferencesLog(prefs));
+  console.log(formatTripProfileLog(profile));
+  console.log(formatSearchRequirementsLog(requirements));
   console.log(`OUTPUT DESTINATION → ${prefs.destination}`);
 
   const retrieval = city ? await retrievePersonalizedPlaces(prefs) : null;
@@ -67,29 +72,10 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
             transportation: agentResult.plan.transportation?.length
               ? agentResult.plan.transportation
               : plan.transportation,
+            dailyItinerary: overlayStopCopy(osmPlanDays, agentResult.plan.dailyItinerary),
           };
-          const constrained = constrainItineraryToPool(
-            {
-              ...agentResult.plan,
-              destination: confirmed?.city || prefs.destination,
-              country: confirmed?.country || retrieval.country,
-              hotelRecommendations: plan.hotelRecommendations,
-              restaurants: plan.restaurants,
-              activities: plan.activities,
-              dailyItinerary: agentResult.plan.dailyItinerary?.length
-                ? agentResult.plan.dailyItinerary
-                : plan.dailyItinerary,
-              neighborhoods: plan.neighborhoods,
-            },
-            retrieval,
-            prefs
-          );
-          plan = constrained.plan;
-          if (confirmed) plan = applyConfirmedDestination(plan, confirmed);
-          plan.dailyItinerary = mergeEmptyDays(plan.dailyItinerary, osmPlanDays);
-          console.log(`VALIDATION → ${constrained.verified}/${constrained.total} itinerary stops match OSM`);
         } else {
-          console.warn(`[Agent] ${agentResult.error}. Using OSM itinerary for ${prefs.destination}.`);
+          console.warn(`[Agent] ${agentResult.error}. Using retrieved itinerary for ${prefs.destination}.`);
         }
       } catch (error) {
         console.warn(`[Agent] exception. Using OSM itinerary for ${prefs.destination}.`, error);
@@ -98,6 +84,16 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
       console.log("OpenAI key missing — returning OSM itinerary without LLM copy.");
     }
 
+    const critic = runCriticRepairLoop(plan, retrieval, prefs, context, osmPlanDays);
+    plan = critic.plan;
+    if (confirmed) plan = applyConfirmedDestination(plan, confirmed);
+    console.log(
+      `CRITIC → ${critic.repaired ? "repaired" : "passed"} after ${critic.attempts} attempt(s)${
+        critic.issues.length ? ` · ${critic.issues.slice(0, 3).join(" | ")}` : ""
+      }`
+    );
+    console.log(`ELAPSED → ${Date.now() - startedAt}ms`);
+    console.log(`PROVIDERS → ${(retrieval.providers ?? []).join(", ") || "none"}`);
     console.log(`FINAL OUTPUT → ${plan.destination}`);
     console.log(`HOTELS → ${plan.hotelRecommendations.map((h) => h.name).join(", ") || "(none)"}`);
     console.log(`RESTAURANTS → ${plan.restaurants.map((r) => r.name).join(", ") || "(none)"}`);
@@ -135,22 +131,37 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
   return confirmed ? applyConfirmedDestination(fallback, confirmed) : fallback;
 }
 
-function mergeEmptyDays(
-  generated: TripPlan["dailyItinerary"],
-  osmDays: TripPlan["dailyItinerary"]
+function overlayStopCopy(
+  assembled: TripPlan["dailyItinerary"],
+  polished?: TripPlan["dailyItinerary"]
 ): TripPlan["dailyItinerary"] {
-  const byDay = new Map(osmDays.map((day) => [day.day, day]));
-  return generated.map((day) => {
-    const fallback = byDay.get(day.day);
-    if (!fallback) return day;
-    const hasStops =
-      day.morning.length + day.afternoon.length + day.evening.length > 0;
-    if (!hasStops) return fallback;
+  if (!polished?.length) return assembled;
+  const copyByName = new Map<string, { description?: string; whyRecommended?: string }>();
+  for (const day of polished) {
+    for (const stop of [...day.morning, ...day.afternoon, ...day.evening]) {
+      copyByName.set(stop.name.toLowerCase().trim(), {
+        description: stop.description,
+        whyRecommended: stop.whyRecommended,
+      });
+    }
+  }
+
+  return assembled.map((day) => {
+    const apply = (stops: TripPlan["dailyItinerary"][number]["morning"]) =>
+      stops.map((stop) => {
+        const copy = copyByName.get(stop.name.toLowerCase().trim());
+        if (!copy) return stop;
+        return {
+          ...stop,
+          description: copy.description || stop.description,
+          whyRecommended: copy.whyRecommended || stop.whyRecommended,
+        };
+      });
     return {
       ...day,
-      morning: day.morning.length ? day.morning : fallback.morning,
-      afternoon: day.afternoon.length ? day.afternoon : fallback.afternoon,
-      evening: day.evening.length ? day.evening : fallback.evening,
+      morning: apply(day.morning),
+      afternoon: apply(day.afternoon),
+      evening: apply(day.evening),
     };
   });
 }

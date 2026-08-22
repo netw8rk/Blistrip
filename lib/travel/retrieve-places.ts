@@ -7,7 +7,12 @@ import {
 } from "./fetch-trip-places";
 import type { UserTripPreferences } from "@/lib/planning/preferences";
 import { activitiesPerDay } from "@/lib/planning/preferences";
-import { orderByProximity, isWithinRadiusKm, DESTINATION_MATCH_KM } from "@/lib/planning/geo";
+import { orderByProximity, isWithinRadiusKm, DESTINATION_MATCH_KM, haversineKm } from "@/lib/planning/geo";
+import { maxWalkKm } from "@/lib/planning/preferences";
+import { buildSearchRequirements } from "@/lib/planning/search-requirements";
+import { SCORING_WEIGHTS } from "@/lib/planning/scoring-weights";
+import { isOpenDuringSlot, type DaySlot } from "./opening-hours";
+import { GooglePlacesProvider } from "./providers/google-places";
 import type { BudgetEstimate, PlannedActivity, StructuredItineraryDraft } from "@/lib/planning/types";
 import { draftToDailyItinerary } from "@/lib/planning/merge";
 import { OpenStreetMapProvider, type OsmCategoryQuery } from "./providers/openstreetmap";
@@ -31,9 +36,11 @@ export interface PlaceRetrievalResult {
   hotels: RankedPlace[];
   restaurants: RankedPlace[];
   diningAndNightlife: RankedPlace[];
+  providers?: string[];
 }
 
 const osm = new OpenStreetMapProvider();
+const google = new GooglePlacesProvider();
 
 export function buildOsmQueries(prefs: UserTripPreferences): OsmCategoryQuery[] {
   const s = prefs.scores;
@@ -169,28 +176,40 @@ export async function retrievePersonalizedPlaces(
   prefs: UserTripPreferences
 ): Promise<PlaceRetrievalResult | null> {
   const queries = buildOsmQueries(prefs);
-  const searches = queries.map((q) => q.id);
-  const raw = await osm.searchByQueries(
-    prefs.destination,
-    prefs.country,
-    queries,
-    prefs.latitude != null && prefs.longitude != null
-      ? { lat: prefs.latitude, lon: prefs.longitude, state: prefs.state }
-      : undefined
-  );
-  if (!raw) return null;
-
-  const retrievedCount = raw.places.length;
+  const requirements = buildSearchRequirements(prefs);
+  const searches = requirements.map((item) => item.id);
   const origin =
     prefs.latitude != null && prefs.longitude != null
       ? { lat: prefs.latitude, lon: prefs.longitude }
-      : raw.latitude != null && raw.longitude != null
-        ? { lat: raw.latitude, lon: raw.longitude }
-        : null;
-  const filtered = raw.places.filter((place) => {
+      : null;
+
+  const [googlePlaces, osmRaw] = await Promise.all([
+    searchGoogleRequirements(prefs, requirements),
+    osm.searchByQueries(
+      prefs.destination,
+      prefs.country,
+      queries,
+      origin ? { lat: origin.lat, lon: origin.lon, state: prefs.state } : undefined
+    ),
+  ]);
+
+  const providers = [
+    googlePlaces.length ? "google_places" : "",
+    osmRaw?.places.length ? "openstreetmap" : "",
+  ].filter(Boolean);
+
+  const merged = dedupePlaces([...googlePlaces, ...(osmRaw?.places ?? [])]);
+  if (merged.length === 0) return null;
+
+  const retrievedCount = merged.length;
+  const center = origin ??
+    (osmRaw?.latitude != null && osmRaw.longitude != null
+      ? { lat: osmRaw.latitude, lon: osmRaw.longitude }
+      : null);
+  const filtered = merged.filter((place) => {
     if (!isUsablePlace(place)) return false;
-    if (!origin || place.latitude == null || place.longitude == null) return false;
-    return isWithinRadiusKm(place.latitude, place.longitude, origin.lat, origin.lon, DESTINATION_MATCH_KM);
+    if (!center || place.latitude == null || place.longitude == null) return false;
+    return isWithinRadiusKm(place.latitude, place.longitude, center.lat, center.lon, DESTINATION_MATCH_KM);
   });
   const ranked = rankPlaces(filtered, prefs);
   const hotels = ranked.filter((r) => r.place.type === "hotel" || r.place.type === "hostel");
@@ -206,20 +225,41 @@ export async function retrievePersonalizedPlaces(
 
   const needed = Math.max(prefs.tripLength * activitiesPerDay(prefs), prefs.tripLength * 3);
   const selected = pickDiverseSelection(dayPlaces, Math.max(needed, 24), prefs);
+  const hotelsSlice = hotels.slice(0, 6);
+  const restaurantsSlice = restaurants.slice(0, 16);
+  const diningSlice = diningAndNightlife.slice(0, 16);
+
+  const cardPlaces = [
+    ...selected,
+    ...hotelsSlice,
+    ...restaurantsSlice,
+    ...diningSlice,
+  ].map((item) => item.place);
+
+  await hydrateGooglePlaceCards(cardPlaces);
+
+  const googleCards = cardPlaces.filter((place) => place.provider === "google_places");
+  const withPhotos = googleCards.filter((place) => place.photoUrls?.[0]).length;
+  if (googleCards.length && withPhotos === 0) {
+    console.warn(
+      "[GooglePlaces] Places loaded without photos. In Google Cloud, enable Places API (New) photos on this key (no field restriction that excludes photos) and confirm billing is active."
+    );
+  }
 
   return {
-    city: raw.city,
-    country: raw.country,
-    latitude: raw.latitude,
-    longitude: raw.longitude,
+    city: prefs.destination || osmRaw?.city || "",
+    country: prefs.country || osmRaw?.country || "",
+    latitude: prefs.latitude ?? osmRaw?.latitude,
+    longitude: prefs.longitude ?? osmRaw?.longitude,
     searches,
+    providers,
     retrievedCount,
     filteredCount: filtered.length,
     ranked: ranked.slice(0, 40),
     selected,
-    hotels: hotels.slice(0, 6),
-    restaurants: restaurants.slice(0, 10),
-    diningAndNightlife: diningAndNightlife.slice(0, 12),
+    hotels: hotelsSlice,
+    restaurants: restaurantsSlice,
+    diningAndNightlife: diningSlice,
   };
 }
 
@@ -244,49 +284,57 @@ export function scorePlace(place: NormalizedPlace, prefs: UserTripPreferences): 
     reasons.push(reason);
   };
 
-  if (type === "restaurant" || type === "cafe" || type === "market") add(s.food * 4, "matches food interest");
-  if (type === "bar" || type === "nightclub") add(s.nightlife * 5, "matches nightlife interest");
-  if (type === "museum") add(Math.max(s.culture, s.history) * 4, "matches culture/history");
+  if (type === "restaurant" || type === "cafe" || type === "market") add(s.food * SCORING_WEIGHTS.interestMatch, "matches food interest");
+  if (type === "bar" || type === "nightclub") add(s.nightlife * SCORING_WEIGHTS.nightlifeMatch, "matches nightlife interest");
+  if (type === "museum") add(Math.max(s.culture, s.history) * SCORING_WEIGHTS.interestMatch, "matches culture/history");
   if (type === "landmark" || type === "church" || tags.historic) {
-    add(Math.max(s.history, s.architecture) * 4, "matches history/architecture");
+    add(Math.max(s.history, s.architecture) * SCORING_WEIGHTS.interestMatch, "matches history/architecture");
   }
-  if (type === "park") add(Math.max(s.nature, s.relaxation) * 4, "matches nature/relaxation");
-  if (type === "shop") add(s.shopping * 4, "matches shopping");
-  if (type === "activity") add(s.adventure * 4, "matches adventure");
+  if (type === "park") add(Math.max(s.nature, s.relaxation) * SCORING_WEIGHTS.interestMatch, "matches nature/relaxation");
+  if (type === "shop") add(s.shopping * SCORING_WEIGHTS.interestMatch, "matches shopping");
+  if (type === "activity") add(s.adventure * SCORING_WEIGHTS.interestMatch, "matches adventure");
   if (type === "attraction") add(Math.max(s.history, s.architecture, s.culture) * 2, "general attraction");
 
   if (prefs.dislikes.includes("museums") && (type === "museum" || /museum/.test(haystack))) {
-    score -= 80;
+    score -= SCORING_WEIGHTS.dislikePenalty;
     reasons.push("filtered: user avoids museums");
   }
   if (prefs.dislikes.includes("nightlife") && (type === "bar" || type === "nightclub")) {
-    score -= 80;
+    score -= SCORING_WEIGHTS.dislikePenalty;
     reasons.push("filtered: user avoids nightlife");
   }
 
   if (prefs.localVsTouristy === "local") {
     if (["bar", "cafe", "market"].includes(type) || tags.amenity === "pub") {
-      add(18, "local/neighborhood venue");
+      add(SCORING_WEIGHTS.localVenue, "local/neighborhood venue");
     }
     if (tags.tourism === "attraction" || tags.wikipedia) {
-      score -= 12;
+      score -= SCORING_WEIGHTS.touristPenalty;
       reasons.push("less tourist-centric preferred");
     }
   }
 
   if (prefs.budgetLevel === "low") {
-    if (["cafe", "market", "park", "hostel"].includes(type)) add(10, "budget-friendly type");
+    if (["cafe", "market", "park", "hostel"].includes(type)) add(SCORING_WEIGHTS.budgetFit, "budget-friendly type");
     if (type === "hotel" && prefs.travelStyle !== "Luxury") score -= 4;
+    if (place.priceLevel != null && place.priceLevel >= 3) score -= 8;
   }
   if (prefs.budgetLevel === "high" && (type === "hotel" || tags.tourism === "attraction")) {
     add(6, "fits higher-budget trip");
   }
 
+  if (place.rating) add(place.rating * SCORING_WEIGHTS.rating, `rated ${place.rating.toFixed(1)}`);
+  if ((place.reviewCount ?? 0) > 50) add(SCORING_WEIGHTS.reviewSignal, "established venue");
+  if (prefs.localVsTouristy === "local" && (place.reviewCount ?? 0) > 4000) {
+    score -= 6;
+    reasons.push("very popular tourist venue");
+  }
+
   const metadataBits = [place.address, place.website, place.openingHours?.length, place.latitude].filter(Boolean).length;
-  add(metadataBits * 2, "useful OSM metadata");
+  if (metadataBits) score += metadataBits * SCORING_WEIGHTS.hoursKnown;
 
   if (prefs.travelers === "Family" && (type === "nightclub" || tags.amenity === "nightclub")) {
-    score -= 20;
+    score -= SCORING_WEIGHTS.familyNightlifePenalty;
     reasons.push("less suitable for family trip");
   }
 
@@ -299,6 +347,7 @@ export function buildDraftFromRankedPlaces(
 ): StructuredItineraryDraft {
   const afternoonCount = prefs.pace === "slow" ? 1 : prefs.pace === "packed" ? 2 : 1;
   const used = new Set<string>();
+  const weekday = prefs.dates?.start ? new Date(`${prefs.dates.start}T12:00:00`).getUTCDay() : 1;
 
   const daytime = uniquePlaces([
     ...retrieval.selected,
@@ -311,7 +360,7 @@ export function buildDraftFromRankedPlaces(
     ...retrieval.ranked.filter((item) => isEveningType(item.place.type)),
   ]);
 
-  const dayBuckets = dealRoundRobin(orderPlaces(daytime), prefs.tripLength);
+  const dayBuckets = clusterPlacesForDays(daytime, prefs.tripLength, maxWalkKm(prefs));
   const eveningBuckets = dealRoundRobin(orderPlaces(eveningPool), prefs.tripLength);
 
   const days = Array.from({ length: prefs.tripLength }, (_, index) => {
@@ -319,9 +368,16 @@ export function buildDraftFromRankedPlaces(
     const dayItems = dayBuckets[index] ?? [];
     const nightItems = eveningBuckets[index] ?? [];
 
-    const morningItem = dayItems[0];
-    const afternoonItems = dayItems.slice(1, 1 + afternoonCount);
-    const eveningItem = nightItems[0] ?? dayItems[1 + afternoonCount];
+    const openDay = dayItems.filter((item) => openFor(item, "morning", weekday) || openFor(item, "afternoon", weekday));
+    const morningItem = openDay.find((item) => openFor(item, "morning", weekday)) ?? openDay[0];
+    const afternoonItems = openDay
+      .filter((item) => item !== morningItem && openFor(item, "afternoon", weekday))
+      .slice(0, afternoonCount);
+    const lastAfternoon = afternoonItems[afternoonItems.length - 1] ?? morningItem;
+    const eveningItem =
+      nearestOpen(nightItems, lastAfternoon, "evening", weekday) ??
+      nightItems.find((item) => openFor(item, "evening", weekday)) ??
+      dayItems[1 + afternoonCount];
 
     if (morningItem) used.add(morningItem.place.id);
     for (const item of afternoonItems) used.add(item.place.id);
@@ -337,6 +393,7 @@ export function buildDraftFromRankedPlaces(
   });
 
   fillEmptySlots(days, [...daytime, ...eveningPool], used, prefs);
+  addAnchoredExperiences(days, prefs);
 
   return {
     destination: prefs.destination || retrieval.city,
@@ -346,7 +403,7 @@ export function buildDraftFromRankedPlaces(
     days,
     selectedAttractionIds: [...used],
     geographicNotes: [
-      `Each day has morning, afternoon, and evening stops when enough OSM places exist.`,
+      `Days are clustered by walking distance and checked against opening hours when available.`,
     ],
   };
 }
@@ -383,12 +440,178 @@ function orderPlaces(items: RankedPlace[]): RankedPlace[] {
   );
 }
 
+async function searchGoogleRequirements(
+  prefs: UserTripPreferences,
+  requirements: ReturnType<typeof buildSearchRequirements>
+): Promise<NormalizedPlace[]> {
+  if (!google.isConfigured() || prefs.latitude == null || prefs.longitude == null) return [];
+
+  const results = await Promise.all(
+    requirements.map((requirement) =>
+      google.searchPlaces({
+        query: requirement.query,
+        type: requirement.placeType,
+        city: prefs.destination,
+        country: prefs.country,
+        latitude: prefs.latitude,
+        longitude: prefs.longitude,
+        radiusMeters: 25000,
+        limit: 10,
+      })
+    )
+  );
+
+  return results.flatMap((result) => result.places).filter((place) => place.name && place.providerPlaceId);
+}
+
+async function hydrateGooglePlaceCards(places: NormalizedPlace[]): Promise<void> {
+  const unique = new Map<string, NormalizedPlace>();
+  for (const place of places) {
+    if (place.provider !== "google_places" || !place.providerPlaceId) continue;
+    unique.set(place.providerPlaceId, place);
+  }
+
+  const targets = [...unique.values()];
+  const batchSize = 8;
+  for (let index = 0; index < targets.length; index += batchSize) {
+    const batch = targets.slice(index, index + batchSize);
+    await Promise.all(
+      batch.map(async (place) => {
+        const needsDetails =
+          !place.photoUrls?.[0] || place.rating == null || place.reviewCount == null || !place.mapsUrl;
+        if (!needsDetails) return;
+        const detailed = await google.getPlaceDetails(place.providerPlaceId!);
+        if (!detailed) return;
+        if (detailed.photoUrls?.length) place.photoUrls = detailed.photoUrls;
+        if (detailed.rating != null) place.rating = detailed.rating;
+        if (detailed.reviewCount != null) place.reviewCount = detailed.reviewCount;
+        if (detailed.openingHours?.length) place.openingHours = detailed.openingHours;
+        if (detailed.website) place.website = detailed.website;
+        if (detailed.mapsUrl) place.mapsUrl = detailed.mapsUrl;
+        if (detailed.phone) place.phone = detailed.phone;
+        if (detailed.priceLevel != null) place.priceLevel = detailed.priceLevel;
+      })
+    );
+  }
+}
+
+function dedupePlaces(places: NormalizedPlace[]): NormalizedPlace[] {
+  const kept: NormalizedPlace[] = [];
+  for (const place of places) {
+    const duplicateIndex = kept.findIndex((existing) => {
+      if (existing.name.toLowerCase() !== place.name.toLowerCase()) return false;
+      if (existing.latitude == null || place.latitude == null || existing.longitude == null || place.longitude == null) {
+        return true;
+      }
+      return haversineKm(existing.latitude, existing.longitude, place.latitude, place.longitude) < 0.25;
+    });
+    if (duplicateIndex === -1) {
+      kept.push(place);
+      continue;
+    }
+    const existing = kept[duplicateIndex];
+    if (place.provider === "google_places" && existing.provider !== "google_places") {
+      kept[duplicateIndex] = place;
+    }
+  }
+  return kept;
+}
+
+function clusterPlacesForDays(items: RankedPlace[], days: number, maxWalk: number): RankedPlace[][] {
+  const remaining = [...orderPlaces(items)];
+  const clusters: RankedPlace[][] = [];
+  const radius = Math.max(maxWalk, 1.4);
+
+  while (remaining.length && clusters.length < days) {
+    const seed = remaining.shift();
+    if (!seed) break;
+    const cluster = [seed];
+    for (let index = remaining.length - 1; index >= 0; index -= 1) {
+      const candidate = remaining[index];
+      const nearby = cluster.some(
+        (member) =>
+          member.place.latitude != null &&
+          member.place.longitude != null &&
+          candidate.place.latitude != null &&
+          candidate.place.longitude != null &&
+          haversineKm(
+            member.place.latitude,
+            member.place.longitude,
+            candidate.place.latitude,
+            candidate.place.longitude
+          ) <= radius
+      );
+      if (nearby && cluster.length < 4) {
+        cluster.push(candidate);
+        remaining.splice(index, 1);
+      }
+    }
+    clusters.push(cluster);
+  }
+
+  remaining.forEach((item, index) => {
+    if (!clusters.length) clusters.push([]);
+    clusters[index % clusters.length].push(item);
+  });
+
+  while (clusters.length < days) clusters.push([]);
+  return clusters.slice(0, days);
+}
+
+function openFor(item: RankedPlace, slot: DaySlot, weekday: number): boolean {
+  return isOpenDuringSlot(item.place.openingHours, slot, weekday);
+}
+
+function nearestOpen(
+  items: RankedPlace[],
+  anchor: RankedPlace | undefined,
+  slot: DaySlot,
+  weekday: number
+): RankedPlace | undefined {
+  const open = items.filter((item) => openFor(item, slot, weekday));
+  if (!anchor?.place.latitude || !anchor.place.longitude) return open[0];
+  return [...open].sort((a, b) => {
+    if (a.place.latitude == null || b.place.latitude == null) return 0;
+    return (
+      haversineKm(anchor.place.latitude!, anchor.place.longitude!, a.place.latitude, a.place.longitude!) -
+      haversineKm(anchor.place.latitude!, anchor.place.longitude!, b.place.latitude, b.place.longitude!)
+    );
+  })[0];
+}
+
 function dealRoundRobin<T>(items: T[], buckets: number): T[][] {
   const dealt: T[][] = Array.from({ length: Math.max(1, buckets) }, () => []);
   items.forEach((item, index) => {
     dealt[index % dealt.length].push(item);
   });
   return dealt;
+}
+
+function addAnchoredExperiences(
+  days: StructuredItineraryDraft["days"],
+  prefs: UserTripPreferences
+) {
+  if (prefs.pace === "packed") return;
+  for (const day of days) {
+    const anchor = day.morning[0];
+    if (!anchor || day.afternoon.length > 0) continue;
+    day.afternoon = [
+      {
+        id: `experience-${day.day}`,
+        name: `Explore the area around ${anchor.name}`,
+        type: "experience",
+        description: `A short neighborhood walk near ${anchor.name} so the day stays local.`,
+        neighborhood: anchor.neighborhood,
+        latitude: anchor.latitude,
+        longitude: anchor.longitude,
+        durationMinutes: 45,
+        estimatedCostLevel: "low",
+        reason: "A short stretch of free time so the day stays nearby and unhurried.",
+        reservationRecommended: false,
+        source: "verified",
+      },
+    ];
+  }
 }
 
 function fillEmptySlots(
@@ -447,7 +670,7 @@ function toPlanned(item: RankedPlace, prefs: UserTripPreferences): PlannedActivi
     id: item.place.id,
     name: item.place.name,
     type: item.place.type,
-    description: item.place.address ?? `Verified ${item.place.type} in ${item.place.city}`,
+    description: item.place.address ?? `${item.place.type} in ${item.place.city}`,
     neighborhood: item.place.address,
     latitude: item.place.latitude,
     longitude: item.place.longitude,
@@ -456,6 +679,10 @@ function toPlanned(item: RankedPlace, prefs: UserTripPreferences): PlannedActivi
     reason: item.reasons[0] ?? `Fits your ${prefs.selectedInterests.slice(0, 2).join(" + ") || "trip"} preferences.`,
     reservationRecommended: item.place.type === "restaurant",
     source: "verified",
+    provider: item.place.provider,
+    providerPlaceId: item.place.providerPlaceId,
+    address: item.place.address,
+    mapsUrl: item.place.mapsUrl,
   };
 }
 
@@ -472,7 +699,8 @@ export function formatRetrievalLog(result: PlaceRetrievalResult): string {
     .map((r, i) => `  ${i + 1}. ${r.place.name} [${r.place.type}] score ${r.score}`)
     .join("\n");
   return [
-    "OSM SEARCHES",
+    "PLACE SEARCHES",
+    ...(result.providers?.length ? [`  providers: ${result.providers.join(", ")}`] : []),
     ...result.searches.map((s) => `  → ${s}`),
     `RETRIEVED → ${result.retrievedCount} candidate places`,
     `FILTERED → ${result.filteredCount} valid candidates`,
@@ -506,6 +734,7 @@ export function constrainItineraryToPool(
   const unused = () => retrieval.selected.filter((item) => !used.has(item.place.id));
 
   const matchActivity = (activity: ItineraryActivity): ItineraryActivity | null => {
+    if (activity.type === "experience") return activity;
     const found =
       (activity.providerPlaceId ? byId.get(activity.providerPlaceId) : undefined) ??
       byName.get(activity.name.toLowerCase().trim());
@@ -523,6 +752,7 @@ export function constrainItineraryToPool(
       provider: found.place.provider,
       providerPlaceId: found.place.providerPlaceId,
       mapsUrl: found.place.mapsUrl,
+      rating: found.place.rating,
       source: "verified",
     };
   };
@@ -551,6 +781,7 @@ export function constrainItineraryToPool(
           provider: item.place.provider,
           providerPlaceId: item.place.providerPlaceId,
           mapsUrl: item.place.mapsUrl,
+          rating: item.place.rating,
           source: "verified",
         };
         if (slots.morning.length === 0) slots.morning.push(filler);
@@ -568,13 +799,13 @@ export function constrainItineraryToPool(
     return toHotelRecommendation(item.place as import("./types").NormalizedHotel, existing?.whyRecommended);
   });
 
-  const dining = retrieval.diningAndNightlife.slice(0, 6);
+  const dining = retrieval.diningAndNightlife.slice(0, 12);
   const restaurantRecs = dining.map((item, index) => {
     const existing = plan.restaurants.find((r) => r.name.toLowerCase() === item.place.name.toLowerCase());
     return toRestaurantRecommendation(item.place, index, existing?.whyRecommended);
   });
 
-  const activityRecs = retrieval.selected.slice(0, 8).map((item) => {
+  const activityRecs = retrieval.selected.slice(0, 16).map((item) => {
     const existing = plan.activities.find((a) => a.name.toLowerCase() === item.place.name.toLowerCase());
     return toActivityRecommendation(item.place, existing?.whyRecommended);
   });
@@ -649,15 +880,15 @@ export function buildPlanFromRetrieval(
   const hotelRecs = retrieval.hotels.slice(0, 3).map((item) =>
     toHotelRecommendation(item.place as import("./types").NormalizedHotel, item.reasons[0])
   );
-  const restaurantRecs = retrieval.diningAndNightlife.slice(0, 6).map((item, index) =>
+  const restaurantRecs = retrieval.diningAndNightlife.slice(0, 12).map((item, index) =>
     toRestaurantRecommendation(item.place, index, item.reasons[0])
   );
-  const activityRecs = retrieval.selected.slice(0, 8).map((item) =>
+  const activityRecs = retrieval.selected.slice(0, 16).map((item) =>
     toActivityRecommendation(item.place, item.reasons[0])
   );
 
   return {
-    tripSummary: `A ${prefs.tripLength}-day ${prefs.travelStyle.toLowerCase()} trip to ${prefs.destinationLabel || prefs.destination || retrieval.city} built from real OpenStreetMap places matching ${prefs.selectedInterests.slice(0, 3).join(", ").toLowerCase() || "your preferences"}.`,
+    tripSummary: `A ${prefs.tripLength}-day ${prefs.travelStyle.toLowerCase()} trip to ${prefs.destinationLabel || prefs.destination || retrieval.city} shaped around ${prefs.selectedInterests.slice(0, 3).join(", ").toLowerCase() || "your preferences"}.`,
     destination: prefs.destination || retrieval.city,
     country: prefs.country || retrieval.country,
     destinationLabel: prefs.destinationLabel,
@@ -669,14 +900,14 @@ export function buildPlanFromRetrieval(
     travelStyle: prefs.travelStyle,
     interests: prefs.selectedInterests,
     recommendedNeighborhood: neighborhoods[0]?.name ?? prefs.destination,
-    neighborhoodReason: neighborhoods[0]?.why ?? `Staying central in ${prefs.destination} keeps the verified stops walkable.`,
+    neighborhoodReason: neighborhoods[0]?.why ?? `Staying central in ${prefs.destination} keeps the day’s stops walkable.`,
     neighborhoods,
     hotelRecommendations: hotelRecs,
     activities: activityRecs,
     restaurants: restaurantRecs,
     transportation: [
       `Use local transit and walking in ${prefs.destination}.`,
-      "Days are grouped by OSM coordinates so nearby stops stay together.",
+      "Each day keeps nearby stops together so you spend less time crossing the city.",
     ],
     dailyItinerary: draftToDailyItinerary(draft),
     budgetBreakdown: {
@@ -687,8 +918,8 @@ export function buildPlanFromRetrieval(
       other: budget.other.amount,
     },
     travelTips: [
-      `Every hotel, restaurant, and stop listed is a real place in ${retrieval.city} from OpenStreetMap.`,
-      "Prices and availability are estimates — OSM does not provide live booking data.",
+      `Book popular restaurants and sights in ${retrieval.city} ahead when you can — hours and prices change.`,
+      "Treat listed prices as planning estimates, not live quotes.",
     ],
     packingRecommendations: ["Comfortable walking shoes", "Universal adapter"],
     travelEssentials: [],
@@ -712,14 +943,14 @@ function neighborhoodsFromPlaces(
     return [
       {
         name: city,
-        bestFor: "Walkable access to the retrieved stops",
-        why: `Real OSM listings were pulled for ${city}. Stay near the center unless a neighborhood stands out.`,
+        bestFor: "Walkable access to the main stops",
+        why: `Stay near the center of ${city} unless a neighborhood stands out for your plans.`,
       },
     ];
   }
   return ranked.map(([name, count], index) => ({
     name,
     bestFor: index === 0 ? "Recommended stay area" : "Also nearby",
-    why: `${count} verified place${count === 1 ? "" : "s"} from your search cluster around ${name}.`,
+    why: `${count} recommended stop${count === 1 ? "" : "s"} sit around ${name}.`,
   }));
 }

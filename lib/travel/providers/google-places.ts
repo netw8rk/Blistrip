@@ -8,6 +8,7 @@ import type {
   ActivitySearchResult,
   NormalizedActivity,
 } from "../types";
+import { googlePhotoUrls } from "../google-links";
 
 const GOOGLE_PLACES_BASE = "https://places.googleapis.com/v1";
 
@@ -22,6 +23,8 @@ const SEARCH_FIELD_MASK = [
   "places.types",
   "places.googleMapsUri",
   "places.websiteUri",
+  "places.regularOpeningHours",
+  "places.photos",
 ].join(",");
 
 const DETAILS_FIELD_MASK = [
@@ -70,9 +73,11 @@ const PLACE_TYPE_TO_GOOGLE: Partial<Record<PlaceType, string>> = {
   church: "church",
   park: "park",
   shop: "store",
-  market: "market",
+  market: "grocery_store",
   landmark: "tourist_attraction",
 };
+
+const GOOGLE_INCLUDED_TYPES = new Set(Object.values(PLACE_TYPE_TO_GOOGLE));
 
 const ACTIVITY_GOOGLE_TYPES = [
   "tourist_attraction",
@@ -153,6 +158,8 @@ function normalizePlace(
     priceLevel: mapPriceLevel(place.priceLevel),
     mapsUrl: place.googleMapsUri,
     website: place.websiteUri,
+    openingHours: place.regularOpeningHours?.weekdayDescriptions,
+    photoUrls: googlePhotoUrls(place.photos),
     source: "verified",
     fetchedAt: new Date().toISOString(),
   };
@@ -168,10 +175,7 @@ function normalizeDetailedPlace(
     ...base,
     phone: place.internationalPhoneNumber,
     openingHours: place.regularOpeningHours?.weekdayDescriptions,
-    photoUrls: place.photos?.map(
-      (p) =>
-        `${GOOGLE_PLACES_BASE}/${p.name}/media?maxWidthPx=800&key=${process.env.GOOGLE_PLACES_API_KEY}`
-    ),
+    photoUrls: googlePhotoUrls(place.photos) ?? base.photoUrls,
   };
 }
 
@@ -205,13 +209,14 @@ export class GooglePlacesProvider implements TravelDataProvider {
       }
 
       if (params.latitude != null && params.longitude != null) {
+        const radius = Math.min(params.radiusMeters ?? 25000, 50000);
         body.locationBias = {
           circle: {
             center: {
               latitude: params.latitude,
               longitude: params.longitude,
             },
-            radius: params.radiusMeters ?? 5000,
+            radius,
           },
         };
       }
@@ -241,8 +246,9 @@ export class GooglePlacesProvider implements TravelDataProvider {
       }
 
       if (!res.ok) {
+        const detail = await res.text().catch(() => "");
         console.error(
-          `[GooglePlaces] Search failed: ${res.status} ${res.statusText}`
+          `[GooglePlaces] Search failed: ${res.status} ${res.statusText}${detail ? ` ${detail.slice(0, 240)}` : ""}`
         );
         return empty;
       }
@@ -298,8 +304,9 @@ export class GooglePlacesProvider implements TravelDataProvider {
       }
 
       if (!res.ok) {
+        const detail = await res.text().catch(() => "");
         console.error(
-          `[GooglePlaces] Details failed: ${res.status} ${res.statusText}`
+          `[GooglePlaces] Details failed: ${res.status} ${res.statusText}${detail ? ` ${detail.slice(0, 240)}` : ""}`
         );
         return null;
       }
@@ -377,7 +384,9 @@ export class GooglePlacesProvider implements TravelDataProvider {
   ): string | undefined {
     if (!type) return undefined;
     const single = Array.isArray(type) ? type[0] : type;
-    return PLACE_TYPE_TO_GOOGLE[single];
+    const mapped = PLACE_TYPE_TO_GOOGLE[single];
+    if (!mapped || !GOOGLE_INCLUDED_TYPES.has(mapped)) return undefined;
+    return mapped;
   }
 
   private extractCityFromAddress(address?: string): string {

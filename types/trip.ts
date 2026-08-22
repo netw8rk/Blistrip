@@ -25,6 +25,7 @@ export interface HotelRecommendation {
   priceRange: string;
   whyRecommended: string;
   rating: number;
+  reviewCount?: number;
   bookingUrl: string;
   neighborhood?: string;
   provider?: string;
@@ -34,6 +35,7 @@ export interface HotelRecommendation {
   longitude?: number;
   mapsUrl?: string;
   website?: string;
+  photoUrl?: string;
   source?: "verified" | "curated" | "ai_suggested";
 }
 
@@ -54,6 +56,7 @@ export interface ActivityRecommendation {
   reviewCount?: number;
   mapsUrl?: string;
   website?: string;
+  photoUrl?: string;
   source?: "verified" | "curated" | "ai_suggested";
 }
 
@@ -74,6 +77,7 @@ export interface RestaurantRecommendation {
   reviewCount?: number;
   mapsUrl?: string;
   website?: string;
+  photoUrl?: string;
   source?: "verified" | "curated" | "ai_suggested";
 }
 

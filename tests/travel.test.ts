@@ -439,6 +439,22 @@ async function runTests() {
     "rejects a Charlotte Florida hotel for a Charlotte NC search"
   );
 
+  console.log("\nGoogle place links:");
+  const { googlePhotoProxyUrl, googlePlacePageUrl } = await import("../lib/travel/google-links");
+  assert(
+    googlePhotoProxyUrl("places/ChIJ123/photos/Abc") === "/api/places/photo?name=places%2FChIJ123%2Fphotos%2FAbc",
+    "builds a local photo proxy URL"
+  );
+  assert(googlePhotoProxyUrl("https://example.com/x") === undefined, "rejects non-Google photo names");
+  assert(
+    googlePlacePageUrl({
+      name: "Mint Museum",
+      provider: "google_places",
+      providerPlaceId: "ChIJ123",
+    }).includes("query_place_id=ChIJ123"),
+    "builds a Google Maps page URL from a place ID"
+  );
+
   // --- Summary ---
   console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
   if (failed > 0) process.exit(1);

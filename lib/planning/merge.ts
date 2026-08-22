@@ -32,6 +32,10 @@ function toItineraryActivity(
     travelTimeFromPrevious: planned.travelTimeFromPreviousMinutes,
     reservationRecommended: planned.reservationRecommended,
     source: planned.source,
+    provider: planned.provider,
+    providerPlaceId: planned.providerPlaceId,
+    address: planned.address,
+    mapsUrl: planned.mapsUrl,
   };
 }
 
@@ -141,7 +145,7 @@ export function buildPlanFromEngine(
   const topNeighborhood = retrieved?.neighborhoods[0];
 
   return {
-    tripSummary: `A ${draft.duration}-day ${draft.pace}-pace trip to ${draft.destination} built from Blistrip's curated knowledge, grouped geographically by neighborhood.`,
+    tripSummary: `A ${draft.duration}-day ${draft.pace}-pace trip to ${draft.destination}, grouped by neighborhood so nearby stops stay together.`,
     destination: draft.destination,
     country: draft.country,
     dates: context.dates ? `${context.dates.start} – ${context.dates.end}` : "Flexible dates",
