@@ -1,3 +1,16 @@
+/** Places farther than this from the confirmed destination are treated as a different city. */
+export const DESTINATION_MATCH_KM = 30;
+
+export function isWithinRadiusKm(
+  lat: number,
+  lon: number,
+  centerLat: number,
+  centerLon: number,
+  maxKm: number = DESTINATION_MATCH_KM
+): boolean {
+  return haversineKm(lat, lon, centerLat, centerLon) <= maxKm;
+}
+
 /** Haversine distance in kilometers between two coordinates. */
 export function haversineKm(
   lat1: number,

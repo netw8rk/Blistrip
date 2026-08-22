@@ -26,10 +26,35 @@ export async function applyTripEdit(
   const intent = context.mode;
 
   if (intent === "live_data_query") {
+    let capabilities;
+    try {
+      const { getTravelCapabilities } = await import("@/lib/travel");
+      capabilities = getTravelCapabilities();
+    } catch {
+      capabilities = { places: false, hotels: false, flights: false, activities: false, routing: false };
+    }
+
+    const hasAnyLiveData = capabilities.places || capabilities.hotels || capabilities.flights || capabilities.activities;
+
+    if (!hasAnyLiveData) {
+      return {
+        tripPlan,
+        changesSummary:
+          "Live hotel, flight, and availability data isn't connected yet. I can optimize your plan using Blistrip's curated knowledge and estimated costs instead.",
+        intent,
+      };
+    }
+
+    const available = [
+      capabilities.places && "place search",
+      capabilities.hotels && "hotel search",
+      capabilities.flights && "flight search",
+      capabilities.activities && "activity search",
+    ].filter(Boolean).join(", ");
+
     return {
       tripPlan,
-      changesSummary:
-        "Live hotel, flight, and availability data isn't connected yet. I can optimize your plan using Blistrip's curated knowledge and estimated costs instead.",
+      changesSummary: `Live data available for: ${available}. Try regenerating your trip for real-time results.`,
       intent,
     };
   }
@@ -188,7 +213,11 @@ async function applyPartialRegeneration(
 ): Promise<EditResult> {
   const pipeline = await runPlanningPipeline({
     ...input,
-    destination: tripPlan.destination,
+    destination: input.destination || tripPlan.destination,
+    destinationCountry: input.destinationCountry || tripPlan.country,
+    destinationLabel: input.destinationLabel || tripPlan.destinationLabel,
+    destinationLatitude: input.destinationLatitude ?? tripPlan.destinationLatitude,
+    destinationLongitude: input.destinationLongitude ?? tripPlan.destinationLongitude,
     destinationUnknown: false,
     additionalNotes: [input.additionalNotes, message].filter(Boolean).join(". "),
   });
@@ -226,6 +255,10 @@ function stripCategoryFromItinerary(tripPlan: TripPlan, category: string): TripP
 function createFallbackInput(tripPlan: TripPlan): TripPlannerInput {
   return {
     destination: tripPlan.destination,
+    destinationCountry: tripPlan.country,
+    destinationLabel: tripPlan.destinationLabel,
+    destinationLatitude: tripPlan.destinationLatitude,
+    destinationLongitude: tripPlan.destinationLongitude,
     destinationUnknown: false,
     flexibleDates: true,
     budget: "$1,000–$2,000",

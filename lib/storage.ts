@@ -5,6 +5,8 @@ import type { TripPlan, SavedTrip, UserPreferences } from "@/types/trip";
 const TRIPS_KEY = "blistrip_trips";
 const SAVED_KEY = "blistrip_saved_trips";
 const PREFS_KEY = "blistrip_user_preferences";
+const ACTIVE_KEY = "blistrip_active_trip";
+const FRESH_KEY = "blistrip_fresh_trip_id";
 
 export function saveTripPlan(trip: TripPlan): void {
   if (typeof window === "undefined") return;
@@ -113,4 +115,51 @@ export function getSessionTrip(id: string): TripPlan | null {
   } catch {
     return null;
   }
+}
+
+export function setActiveTrip(trip: TripPlan): void {
+  if (typeof window === "undefined") return;
+  const payload = JSON.stringify(trip);
+  sessionStorage.setItem(ACTIVE_KEY, payload);
+  sessionStorage.setItem(FRESH_KEY, trip.id);
+  localStorage.setItem(ACTIVE_KEY, payload);
+  setSessionTrip(trip);
+  saveTripPlan(trip);
+}
+
+export function getActiveTrip(): TripPlan | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(ACTIVE_KEY) ?? localStorage.getItem(ACTIVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getFreshTripId(): string | null {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem(FRESH_KEY);
+}
+
+function newestTrip(...plans: Array<TripPlan | null>): TripPlan | null {
+  return (
+    plans
+      .filter((plan): plan is TripPlan => Boolean(plan?.id))
+      .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))[0] ?? null
+  );
+}
+
+export function loadTripForResultsPage(urlId: string, preferActive: boolean): TripPlan | null {
+  const active = getActiveTrip();
+
+  if (preferActive && active) {
+    return active;
+  }
+
+  if (active?.id === urlId) {
+    return newestTrip(active, getSessionTrip(urlId), getTripPlan(urlId));
+  }
+
+  return newestTrip(getSessionTrip(urlId), getTripPlan(urlId));
 }

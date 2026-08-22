@@ -12,6 +12,7 @@ import {
   repairItineraryDuplicates,
 } from "./validator";
 import type { PlanningPipelineResult } from "./types";
+import { getConfirmedDestination, knowledgeMatchesConfirmed } from "./confirmed-destination";
 
 export async function runPlanningPipeline(
   input: TripPlannerInput,
@@ -42,6 +43,14 @@ export async function runPlanningPipeline(
       }
     } else if (context.destination) {
       retrieved = await retrieveContextForDestination(context.destination, context);
+      const confirmed = getConfirmedDestination(input);
+      if (
+        retrieved.destination &&
+        confirmed &&
+        !knowledgeMatchesConfirmed(confirmed, retrieved.destination)
+      ) {
+        retrieved = { destination: null, neighborhoods: [], attractions: [], dayTrips: [] };
+      }
       if (!retrieved.destination) {
         return {
           context,
@@ -60,7 +69,7 @@ export async function runPlanningPipeline(
             ],
           },
           clarifyingQuestions: context.clarifyingQuestions,
-          budgetEstimate: null,
+          budgetEstimate: estimateTripBudget(context, null),
         };
       }
     }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Loader2, MessageSquare, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { saveTripPlan, setSessionTrip } from "@/lib/storage";
+import { setActiveTrip } from "@/lib/storage";
 import type { TripPlan } from "@/types/trip";
 
 interface TripRefinePanelProps {
@@ -39,8 +39,7 @@ export function TripRefinePanel({ trip, onUpdate }: TripRefinePanelProps) {
 
       const updated = data.tripPlan as TripPlan;
       onUpdate(updated);
-      saveTripPlan(updated);
-      setSessionTrip(updated);
+      setActiveTrip(updated);
       setFeedback(data.changesSummary ?? "Trip updated.");
       setMessage("");
     } catch {

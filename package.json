@@ -11,7 +11,9 @@
     "start": "next start",
     "lint": "next lint",
     "test:knowledge": "npx tsx tests/knowledge.test.ts",
-    "test:planning": "npx tsx tests/planning.test.ts"
+    "test:planning": "npx tsx tests/planning.test.ts",
+    "test:travel": "npx tsx tests/travel.test.ts",
+    "test": "npx tsx tests/knowledge.test.ts && npx tsx tests/planning.test.ts && npx tsx tests/travel.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.1.5",

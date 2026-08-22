@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
   MapPin,
@@ -25,11 +26,11 @@ import { SimpleDialog } from "@/components/ui/dialog";
 import { formatCurrency } from "@/lib/utils";
 import { track } from "@/lib/analytics";
 import {
-  getTripPlan,
-  getSessionTrip,
+  loadTripForResultsPage,
   saveTripToSaved,
   isTripSaved,
   deleteSavedTrip,
+  setActiveTrip,
 } from "@/lib/storage";
 import type { TripPlan, ItineraryActivity } from "@/types/trip";
 import { getDestinationImage } from "@/lib/images";
@@ -40,15 +41,23 @@ interface TripResultsProps {
 }
 
 export function TripResults({ tripId }: TripResultsProps) {
+  const searchParams = useSearchParams();
   const [trip, setTrip] = useState<TripPlan | null>(null);
+  const [ready, setReady] = useState(false);
   const [saved, setSaved] = useState(false);
   const [whyDialog, setWhyDialog] = useState<{ title: string; reason: string } | null>(null);
 
   useEffect(() => {
-    const plan = getSessionTrip(tripId) ?? getTripPlan(tripId);
+    const preferActive = searchParams.get("fresh") === "1";
+    const plan = loadTripForResultsPage(tripId, preferActive);
     setTrip(plan);
-    setSaved(isTripSaved(tripId));
-  }, [tripId]);
+    setSaved(plan ? isTripSaved(plan.id) : isTripSaved(tripId));
+    setReady(true);
+
+    if (preferActive && plan && typeof window !== "undefined") {
+      window.history.replaceState(null, "", `/trip/${plan.id}`);
+    }
+  }, [tripId, searchParams]);
 
   const handleSave = () => {
     if (!trip) return;
@@ -65,6 +74,14 @@ export function TripResults({ tripId }: TripResultsProps) {
   const handleAffiliateClick = (type: "hotel" | "activity" | "restaurant" | "product", name: string) => {
     track(`${type === "hotel" ? "hotel" : "activity"}_clicked`, { name, destination: trip?.destination });
   };
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center px-4">
+        <p className="text-sm text-muted">Loading your trip…</p>
+      </div>
+    );
+  }
 
   if (!trip) {
     return (
@@ -113,6 +130,26 @@ export function TripResults({ tripId }: TripResultsProps) {
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 text-foreground">
             Your <span className="text-destination">{trip.destination}</span> Trip
           </h1>
+          {(trip.destinationLabel || trip.country) && (
+            <p className="mb-3">
+              {trip.destinationLatitude != null && trip.destinationLongitude != null ? (
+                <a
+                  href={`https://www.openstreetmap.org/?mlat=${trip.destinationLatitude}&mlon=${trip.destinationLongitude}#map=12/${trip.destinationLatitude}/${trip.destinationLongitude}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-primary transition-colors"
+                >
+                  <MapPin className="h-4 w-4" />
+                  {trip.destinationLabel || [trip.destination, trip.country].filter(Boolean).join(", ")}
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-sm text-foreground-secondary">
+                  <MapPin className="h-4 w-4" />
+                  {trip.destinationLabel || [trip.destination, trip.country].filter(Boolean).join(", ")}
+                </span>
+              )}
+            </p>
+          )}
           <p className="text-muted text-sm sm:text-base tracking-wide uppercase">
             <span className="text-stat">{trip.duration} Days</span> &bull; <span className="text-stat">{formatCurrency(trip.estimatedBudget)}</span> Budget &bull; {trip.interests.join(" + ")}
           </p>
@@ -164,25 +201,39 @@ export function TripResults({ tripId }: TripResultsProps) {
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="font-semibold">{hotel.name}</h3>
-                  <div className="flex items-center gap-1 text-xs text-accent-text shrink-0 ml-2">
-                    <Star className="h-3 w-3 fill-foreground-secondary text-foreground-secondary" />
-                    {hotel.rating}
-                  </div>
+                  {hotel.rating > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-accent-text shrink-0 ml-2">
+                      <Star className="h-3 w-3 fill-foreground-secondary text-foreground-secondary" />
+                      {hotel.rating}
+                    </div>
+                  )}
                 </div>
                 <p className="text-sm text-accent-text mb-2">{hotel.priceRange}</p>
                 <p className="text-sm text-foreground-secondary mb-3">{hotel.description}</p>
-                <p className="text-xs text-muted mb-4 italic">&ldquo;{hotel.whyRecommended}&rdquo;</p>
-                <a
-                  href={hotel.bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => handleAffiliateClick("hotel", hotel.name)}
-                >
-                  <Button variant="outline" size="sm" className="w-full">
-                    View Hotel
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                </a>
+                <p className="text-xs text-muted mb-3 italic">&ldquo;{hotel.whyRecommended}&rdquo;</p>
+                {hotel.address && (
+                  <p className="text-xs text-muted mb-2 flex items-center gap-1">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    {hotel.address}
+                  </p>
+                )}
+                <div className="flex items-center gap-2">
+                  {hotel.source === "verified" && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">Verified</Badge>
+                  )}
+                  <a
+                    href={hotel.mapsUrl || hotel.bookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => handleAffiliateClick("hotel", hotel.name)}
+                    className="flex-1"
+                  >
+                    <Button variant="outline" size="sm" className="w-full">
+                      {hotel.mapsUrl ? "View on Map" : "View Hotel"}
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </a>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -213,14 +264,27 @@ export function TripResults({ tripId }: TripResultsProps) {
                         <div key={i} className="rounded-xl bg-background/50 p-3 border border-border">
                           <p className="text-sm font-medium mb-1 text-highlight">{activity.name}</p>
                           <p className="text-xs text-muted mb-2">{activity.description}</p>
-                          <button
-                            type="button"
-                            onClick={() => setWhyDialog({ title: activity.name, reason: activity.whyRecommended })}
-                            className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover transition-colors"
-                          >
-                            <Info className="h-3 w-3" />
-                            Why this?
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setWhyDialog({ title: activity.name, reason: activity.whyRecommended })}
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-hover transition-colors"
+                            >
+                              <Info className="h-3 w-3" />
+                              Why this?
+                            </button>
+                            {activity.source === "verified" && activity.mapsUrl && (
+                              <a
+                                href={activity.mapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-foreground-secondary hover:text-foreground transition-colors"
+                              >
+                                <MapPin className="h-3 w-3" />
+                                Map
+                              </a>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -277,18 +341,36 @@ export function TripResults({ tripId }: TripResultsProps) {
                   <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" />{activity.price}</span>
                   <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{activity.duration}</span>
                 </div>
-                <p className="text-xs text-muted italic mb-4">&ldquo;{activity.whyRecommended}&rdquo;</p>
-                <a
-                  href={activity.bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => handleAffiliateClick("activity", activity.name)}
-                >
-                  <Button variant="outline" size="sm" className="w-full">
-                    View Activity
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                </a>
+                <p className="text-xs text-muted italic mb-3">&ldquo;{activity.whyRecommended}&rdquo;</p>
+                {activity.address && (
+                  <p className="text-xs text-muted mb-2 flex items-center gap-1">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    {activity.address}
+                  </p>
+                )}
+                {activity.rating && (
+                  <p className="text-xs text-muted mb-2 flex items-center gap-1">
+                    <Star className="h-3 w-3 fill-foreground-secondary text-foreground-secondary" />
+                    {activity.rating}{activity.reviewCount ? ` (${activity.reviewCount} reviews)` : ""}
+                  </p>
+                )}
+                <div className="flex items-center gap-2">
+                  {activity.source === "verified" && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">Verified</Badge>
+                  )}
+                  <a
+                    href={activity.mapsUrl || activity.bookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => handleAffiliateClick("activity", activity.name)}
+                    className="flex-1"
+                  >
+                    <Button variant="outline" size="sm" className="w-full">
+                      {activity.mapsUrl ? "View on Map" : "View Activity"}
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </a>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -312,19 +394,39 @@ export function TripResults({ tripId }: TripResultsProps) {
                       <h4 className="font-semibold">{r.name}</h4>
                       <Badge variant="outline">{r.priceRange}</Badge>
                     </div>
-                    <p className="text-xs text-muted mb-2">{r.cuisine} · {r.location}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted mb-2">
+                      <span>{r.cuisine} · {r.location}</span>
+                      {r.rating && (
+                        <span className="flex items-center gap-0.5">
+                          <Star className="h-3 w-3 fill-foreground-secondary text-foreground-secondary" />
+                          {r.rating}
+                          {r.reviewCount ? ` (${r.reviewCount})` : ""}
+                        </span>
+                      )}
+                    </div>
+                    {r.address && (
+                      <p className="text-xs text-muted mb-1 flex items-center gap-1">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        {r.address}
+                      </p>
+                    )}
                     <p className="text-sm text-foreground-secondary mb-3">{r.whyRecommended}</p>
-                    <a
-                      href={r.bookingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => handleAffiliateClick("restaurant", r.name)}
-                    >
-                      <Button variant="ghost" size="sm" className="px-0">
-                        View Restaurant
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    </a>
+                    <div className="flex items-center gap-2">
+                      {r.source === "verified" && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">Verified</Badge>
+                      )}
+                      <a
+                        href={r.mapsUrl || r.bookingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => handleAffiliateClick("restaurant", r.name)}
+                      >
+                        <Button variant="ghost" size="sm" className="px-0">
+                          {r.mapsUrl ? "View on Map" : "View Restaurant"}
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </a>
+                    </div>
                   </Card>
                 ))}
               </div>

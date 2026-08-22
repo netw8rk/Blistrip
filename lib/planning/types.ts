@@ -51,7 +51,7 @@ export interface PlannedActivity {
   reason: string;
   travelTimeFromPreviousMinutes?: number;
   reservationRecommended: boolean;
-  source: "blistrip" | "ai_estimate";
+  source: "blistrip" | "ai_estimate" | "verified";
 }
 
 export interface PlannedDay {

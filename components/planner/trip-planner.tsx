@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
-import { saveTripPlan, setSessionTrip } from "@/lib/storage";
+import { setActiveTrip } from "@/lib/storage";
 import type { TripPlannerInput } from "@/types/trip";
 import {
   BUDGET_OPTIONS,
@@ -18,6 +18,8 @@ import {
   TRAVELER_OPTIONS,
   TRAVEL_STYLE_OPTIONS,
 } from "@/types/trip";
+import { DestinationPicker } from "@/components/planner/destination-picker";
+import type { DestinationSuggestion } from "@/lib/travel/suggest-places";
 
 const TOTAL_STEPS = 8;
 
@@ -70,7 +72,6 @@ function OptionButton({ selected, onClick, children, className }: OptionButtonPr
 }
 
 export function TripPlanner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [input, setInput] = useState<TripPlannerInput>(initialInput);
@@ -79,13 +80,42 @@ export function TripPlanner() {
   const [error, setError] = useState("");
   const [customBudgetMode, setCustomBudgetMode] = useState(false);
 
+  const destinationSelected =
+    !input.destinationUnknown &&
+    input.destinationLatitude != null &&
+    input.destinationLongitude != null;
+
   useEffect(() => {
     const dest = searchParams.get("destination");
     if (dest) {
       setInput((prev) => ({ ...prev, destination: dest, destinationUnknown: false }));
+      void resolvePrefillDestination(dest);
     }
     track("planner_started");
   }, [searchParams]);
+
+  async function resolvePrefillDestination(dest: string) {
+    try {
+      const res = await fetch(`/api/places/suggest?q=${encodeURIComponent(dest)}`);
+      const data = (await res.json()) as { suggestions?: DestinationSuggestion[] };
+      const match =
+        data.suggestions?.find((item) => item.city.toLowerCase() === dest.toLowerCase()) ??
+        data.suggestions?.[0];
+      if (!match) return;
+      setInput((prev) => ({
+        ...prev,
+        destination: match.city,
+        destinationCountry: match.country,
+        destinationState: match.state,
+        destinationLabel: match.label,
+        destinationLatitude: match.latitude,
+        destinationLongitude: match.longitude,
+        destinationUnknown: false,
+      }));
+    } catch {
+      // User can still pick from the dropdown.
+    }
+  }
 
   const update = useCallback(<K extends keyof TripPlannerInput>(key: K, value: TripPlannerInput[K]) => {
     setInput((prev) => ({ ...prev, [key]: value }));
@@ -106,7 +136,7 @@ export function TripPlanner() {
       case 1:
         return input.destinationUnknown
           ? !!input.destinationDescription?.trim()
-          : !!input.destination.trim();
+          : destinationSelected;
       case 2:
         return input.flexibleDates || (!!input.startDate && !!input.endDate);
       case 3:
@@ -143,7 +173,7 @@ export function TripPlanner() {
 
   const getStepError = (s: number): string => {
     switch (s) {
-      case 1: return input.destinationUnknown ? "Describe the kind of trip you want" : "Enter a destination";
+      case 1: return input.destinationUnknown ? "Describe the kind of trip you want" : "Pick a destination from the list so we search the right place";
       case 2: return "Select dates or choose flexible dates";
       case 3: return "Select or enter your budget";
       case 5: return "Select at least one interest";
@@ -175,7 +205,11 @@ export function TripPlanner() {
 
       const res = await fetch("/api/plan-trip", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
         body: JSON.stringify(payload),
       });
 
@@ -185,10 +219,9 @@ export function TripPlanner() {
       }
 
       const trip = await res.json();
-      saveTripPlan(trip);
-      setSessionTrip(trip);
+      setActiveTrip(trip);
       track("trip_generated", { destination: trip.destination, duration: trip.duration });
-      router.push(`/trip/${trip.id}`);
+      window.location.assign(`/trip/${encodeURIComponent(trip.id)}?fresh=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setLoading(false);
@@ -231,19 +264,55 @@ export function TripPlanner() {
         {step === 1 && (
           <StepWrapper
             title="Where are you going?"
-            subtitle="Enter a destination or tell us what kind of trip you're looking for."
+            subtitle="Type a city, then pick the matching place from the list so we search the right location."
           >
             {!input.destinationUnknown ? (
               <>
-                <Input
-                  placeholder="e.g. Prague, Budapest, Lisbon..."
+                <DestinationPicker
                   value={input.destination}
-                  onChange={(e) => update("destination", e.target.value)}
+                  selected={destinationSelected}
+                  selectedLabel={input.destinationLabel}
                   autoFocus
+                  onQueryChange={(value) => {
+                    setInput((prev) => ({
+                      ...prev,
+                      destination: value,
+                      destinationCountry: undefined,
+                      destinationState: undefined,
+                      destinationLabel: undefined,
+                      destinationLatitude: undefined,
+                      destinationLongitude: undefined,
+                    }));
+                    setError("");
+                  }}
+                  onSelect={(suggestion) => {
+                    setInput((prev) => ({
+                      ...prev,
+                      destination: suggestion.city,
+                      destinationCountry: suggestion.country,
+                      destinationState: suggestion.state,
+                      destinationLabel: suggestion.label,
+                      destinationLatitude: suggestion.latitude,
+                      destinationLongitude: suggestion.longitude,
+                      destinationUnknown: false,
+                    }));
+                    setError("");
+                  }}
                 />
                 <button
                   type="button"
-                  onClick={() => update("destinationUnknown", true)}
+                  onClick={() => {
+                    setInput((prev) => ({
+                      ...prev,
+                      destinationUnknown: true,
+                      destinationCountry: undefined,
+                      destinationState: undefined,
+                      destinationLabel: undefined,
+                      destinationLatitude: undefined,
+                      destinationLongitude: undefined,
+                    }));
+                    setError("");
+                  }}
                   className="text-sm text-primary hover:text-primary-hover transition-colors mt-2"
                 >
                   I don&apos;t know yet — help me decide

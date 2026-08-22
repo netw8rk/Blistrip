@@ -2,6 +2,11 @@ export interface TripPlannerInput {
   destination: string;
   destinationUnknown: boolean;
   destinationDescription?: string;
+  destinationCountry?: string;
+  destinationState?: string;
+  destinationLabel?: string;
+  destinationLatitude?: number;
+  destinationLongitude?: number;
   startDate?: string;
   endDate?: string;
   flexibleDates: boolean;
@@ -22,6 +27,14 @@ export interface HotelRecommendation {
   rating: number;
   bookingUrl: string;
   neighborhood?: string;
+  provider?: string;
+  providerPlaceId?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  mapsUrl?: string;
+  website?: string;
+  source?: "verified" | "curated" | "ai_suggested";
 }
 
 export interface ActivityRecommendation {
@@ -32,6 +45,16 @@ export interface ActivityRecommendation {
   whyRecommended: string;
   bookingUrl: string;
   category?: string;
+  provider?: string;
+  providerPlaceId?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  rating?: number;
+  reviewCount?: number;
+  mapsUrl?: string;
+  website?: string;
+  source?: "verified" | "curated" | "ai_suggested";
 }
 
 export interface RestaurantRecommendation {
@@ -42,6 +65,16 @@ export interface RestaurantRecommendation {
   location: string;
   category: "cheap" | "mid-range" | "special-occasion";
   bookingUrl: string;
+  provider?: string;
+  providerPlaceId?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  rating?: number;
+  reviewCount?: number;
+  mapsUrl?: string;
+  website?: string;
+  source?: "verified" | "curated" | "ai_suggested";
 }
 
 export interface NeighborhoodRecommendation {
@@ -54,7 +87,6 @@ export interface ItineraryActivity {
   name: string;
   description: string;
   whyRecommended: string;
-  /** Linked Blistrip knowledge base ID when sourced from curated data */
   knowledgeId?: string;
   type?: string;
   neighborhood?: string;
@@ -64,8 +96,12 @@ export interface ItineraryActivity {
   estimatedCostLevel?: string;
   travelTimeFromPrevious?: number;
   reservationRecommended?: boolean;
-  /** blistrip = curated knowledge; ai_estimate = AI assumption */
-  source?: "blistrip" | "ai_estimate";
+  source?: "blistrip" | "ai_estimate" | "verified" | "curated";
+  provider?: string;
+  providerPlaceId?: string;
+  address?: string;
+  rating?: number;
+  mapsUrl?: string;
 }
 
 export interface DailyItinerary {
@@ -97,6 +133,9 @@ export interface TripPlan {
   tripSummary: string;
   destination: string;
   country: string;
+  destinationLabel?: string;
+  destinationLatitude?: number;
+  destinationLongitude?: number;
   dates: string;
   duration: number;
   estimatedBudget: number;

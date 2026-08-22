@@ -379,13 +379,20 @@ function inferDestination(input: TripPlannerInput): string {
 }
 
 export function generateMockTrip(input: TripPlannerInput): TripPlan {
-  const destination = inferDestination(input);
+  const destination = !input.destinationUnknown && input.destination
+    ? input.destination
+    : inferDestination(input);
   const destInfo = getDestinationByName(destination);
   const duration = calculateDuration(input.startDate, input.endDate, input.flexibleDates);
   const budget = parseBudgetRange(input.budget, input.customBudget);
   const interests = input.interests.length > 0 ? input.interests : ["History", "Food", "Culture"];
+  const countryMatches =
+    !input.destinationCountry ||
+    !destInfo?.country ||
+    destInfo.country.toLowerCase() === input.destinationCountry.toLowerCase();
 
-  const baseData = destinationData[destination] ?? destinationData.Prague;
+  const hasCurated = Boolean(destinationData[destination]) && countryMatches;
+  const baseData: Partial<TripPlan> = hasCurated ? destinationData[destination] : {};
   const dates = input.flexibleDates
     ? "Flexible dates"
     : input.startDate && input.endDate
@@ -405,7 +412,10 @@ export function generateMockTrip(input: TripPlannerInput): TripPlan {
     id: generateId(),
     tripSummary: `A ${duration}-day ${input.travelStyle.toLowerCase()} trip to ${destination} built around ${interests.slice(0, 3).join(", ").toLowerCase()}. We've balanced must-see sights with local experiences that match your ${input.pace.toLowerCase()} pace and ${input.travelers.toLowerCase()} travel style.`,
     destination,
-    country: baseData.country ?? destInfo?.country ?? "Europe",
+    country: input.destinationCountry || baseData.country || destInfo?.country || "",
+    destinationLabel: input.destinationLabel,
+    destinationLatitude: input.destinationLatitude,
+    destinationLongitude: input.destinationLongitude,
     dates,
     duration,
     estimatedBudget: budget,

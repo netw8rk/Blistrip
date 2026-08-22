@@ -10,6 +10,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Destination is required" }, { status: 400 });
     }
 
+    if (
+      !input.destinationUnknown &&
+      (input.destinationLatitude == null || input.destinationLongitude == null)
+    ) {
+      return NextResponse.json(
+        { error: "Pick a destination from the list so we search the right place" },
+        { status: 400 }
+      );
+    }
+
     if (input.destinationUnknown && !input.destinationDescription?.trim()) {
       return NextResponse.json(
         { error: "Please describe the kind of trip you want" },
@@ -18,7 +28,11 @@ export async function POST(request: NextRequest) {
     }
 
     const trip = await generateTripPlan(input);
-    return NextResponse.json(trip);
+    return NextResponse.json(trip, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+      },
+    });
   } catch {
     return NextResponse.json({ error: "Failed to generate trip plan" }, { status: 500 });
   }

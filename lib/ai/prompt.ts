@@ -11,6 +11,12 @@ import {
   formatDiscoveryForPrompt,
   formatBudgetForPrompt,
 } from "@/lib/planning/merge";
+import type { VerifiedTripPlaces } from "@/lib/travel/fetch-trip-places";
+import { formatVerifiedPlacesForPrompt } from "@/lib/travel/fetch-trip-places";
+import type { UserTripPreferences } from "@/lib/planning/preferences";
+import { formatPreferencesLog } from "@/lib/planning/preferences";
+import type { PlaceRetrievalResult } from "@/lib/travel/retrieve-places";
+import { formatRankedPoolForPrompt } from "@/lib/travel/retrieve-places";
 
 export const TRAVEL_PLANNER_SYSTEM_PROMPT = `You are a highly capable travel planner for Blistrip, using curated travel knowledge and structured planning output.
 
@@ -62,6 +68,62 @@ Valid JSON only. Use this structure:
 
 Create 3 neighborhoods, 3 hotels (estimates), 6-8 activities, 6 restaurants, and daily itinerary matching the pre-computed structure.`;
 
+export const AGENT_SYSTEM_PROMPT = `You are Blistrip's itinerary assembler.
+
+You are NOT a generic travel chatbot. You do NOT invent places from memory.
+
+A personalized pool of REAL OpenStreetMap places has already been retrieved and ranked for this user.
+
+YOUR JOB:
+- Select places from the provided pool
+- Sequence them into a geographically coherent itinerary
+- Group nearby places on the same day
+- Explain briefly why each selected place fits this user
+- Respect pace, budget, walking tolerance, and party type
+
+HARD RULES:
+1. Every hotel, restaurant, bar, attraction, and activity MUST come from the PERSONALIZED REAL PLACE POOL.
+2. Copy name and providerPlaceId exactly. Never invent a name, address, or coordinate.
+3. If the pool is missing a category, omit it rather than fabricating.
+4. Do not claim live prices, reviews, or availability. OSM does not provide those reliably.
+5. Budget is a planning constraint, not a price quote.
+6. Keep each day walkable. Do not bounce across the city.
+7. Slow pace = fewer stops. Packed pace = more stops from the pool.
+
+Set source to "verified" for every real place.
+
+RESPONSE FORMAT:
+Valid JSON matching the schema below. All real-world places must include provider/providerPlaceId fields.
+
+{
+  "tripSummary": "2-3 sentence overview",
+  "destination": "City",
+  "country": "Country",
+  "dates": "Date range or Flexible dates",
+  "duration": number,
+  "estimatedBudget": number,
+  "travelStyle": "style",
+  "interests": ["array"],
+  "recommendedNeighborhood": "name",
+  "neighborhoodReason": "why",
+  "neighborhoods": [{ "name": "", "bestFor": "", "why": "" }],
+  "hotelRecommendations": [{ "name": "", "description": "", "priceRange": "", "whyRecommended": "", "rating": 0, "neighborhood": "", "provider": "", "providerPlaceId": "", "address": "", "latitude": 0, "longitude": 0, "mapsUrl": "", "website": "", "source": "verified|curated|ai_suggested" }],
+  "activities": [{ "name": "", "description": "", "price": "", "duration": "", "whyRecommended": "", "category": "", "provider": "", "providerPlaceId": "", "address": "", "latitude": 0, "longitude": 0, "rating": 0, "mapsUrl": "", "source": "verified|curated|ai_suggested" }],
+  "restaurants": [{ "name": "", "cuisine": "", "priceRange": "", "whyRecommended": "", "location": "", "category": "cheap|mid-range|special-occasion", "provider": "", "providerPlaceId": "", "address": "", "latitude": 0, "longitude": 0, "rating": 0, "reviewCount": 0, "mapsUrl": "", "website": "", "source": "verified|curated|ai_suggested" }],
+  "transportation": ["tip"],
+  "dailyItinerary": [{
+    "day": 1,
+    "title": "Day title",
+    "morning": [{ "name": "", "description": "", "whyRecommended": "", "provider": "", "providerPlaceId": "", "latitude": 0, "longitude": 0, "source": "verified|curated" }],
+    "afternoon": [{ "name": "", "description": "", "whyRecommended": "", "provider": "", "providerPlaceId": "", "source": "verified|curated" }],
+    "evening": [{ "name": "", "description": "", "whyRecommended": "", "provider": "", "providerPlaceId": "", "source": "verified|curated" }]
+  }],
+  "budgetBreakdown": { "accommodation": 0, "food": 0, "activities": 0, "transportation": 0, "other": 0 },
+  "travelTips": ["tip"],
+  "packingRecommendations": ["item"],
+  "travelEssentials": [{ "name": "", "description": "", "price": "", "category": "" }]
+}`;
+
 interface BuildPromptOptions {
   input: Record<string, unknown>;
   retrievedContext?: RetrievedContext | null;
@@ -72,6 +134,9 @@ interface BuildPromptOptions {
     budgetEstimate: BudgetEstimate | null;
     clarifyingQuestions: string[];
     rankedTop: AttractionScore[];
+    verifiedPlaces?: VerifiedTripPlaces | null;
+    preferences?: UserTripPreferences;
+    retrieval?: PlaceRetrievalResult | null;
   };
 }
 
@@ -86,6 +151,19 @@ export function buildUserPrompt(options: BuildPromptOptions | Record<string, unk
   const retrieved = opts.retrievedContext ?? retrievedContext;
 
   let prompt = `Create a personalized trip plan:\n\n${JSON.stringify(input, null, 2)}`;
+
+  if (pipeline?.preferences?.destinationLabel || pipeline?.preferences?.destination) {
+    prompt += `\n\n--- CONFIRMED DESTINATION ---`;
+    prompt += `\nThe user picked this exact place. Keep the entire itinerary in this location. Do not switch cities.`;
+    prompt += `\nPlace: ${pipeline.preferences.destinationLabel || pipeline.preferences.destination}`;
+    if (pipeline.preferences.country) prompt += `\nCountry: ${pipeline.preferences.country}`;
+    if (pipeline.preferences.latitude != null && pipeline.preferences.longitude != null) {
+      prompt += `\nCoordinates: ${pipeline.preferences.latitude}, ${pipeline.preferences.longitude}`;
+    }
+    prompt += `\nJSON destination must be "${pipeline.preferences.destination}"`;
+    if (pipeline.preferences.country) prompt += ` and country must be "${pipeline.preferences.country}"`;
+    prompt += `\n--- END CONFIRMED DESTINATION ---`;
+  }
 
   if (pipeline?.context) {
     prompt += `\n\n--- PLANNING CONTEXT ---`;
@@ -134,6 +212,16 @@ export function buildUserPrompt(options: BuildPromptOptions | Record<string, unk
       }
     }
     prompt += `\n--- END BLISTRIP KNOWLEDGE ---`;
+  }
+
+  if (pipeline?.preferences) {
+    prompt += `\n\n--- STRUCTURED USER PREFERENCES ---\n${formatPreferencesLog(pipeline.preferences)}\n--- END PREFERENCES ---\n`;
+  }
+
+  if (pipeline?.retrieval) {
+    prompt += formatRankedPoolForPrompt(pipeline.retrieval);
+  } else if (pipeline?.verifiedPlaces) {
+    prompt += formatVerifiedPlacesForPrompt(pipeline.verifiedPlaces);
   }
 
   if (pipeline?.draftItinerary) {

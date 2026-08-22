@@ -141,7 +141,7 @@ async function runTests() {
   };
   const edit5 = await applyTripEdit(tripWithCastle, "Move Prague Castle to day 3");
   const day3 = edit5.tripPlan.dailyItinerary.find((d) => d.day === 3);
-  assert(day3?.morning.some((a) => a.name.includes("Prague Castle")), "Castle moved to day 3");
+  assert(day3?.morning.some((a) => a.name.includes("Prague Castle")) ?? false, "Castle moved to day 3");
   assert(
     !edit5.tripPlan.dailyItinerary.find((d) => d.day === 1)?.morning.some((a) => a.name.includes("Prague Castle")),
     "Castle removed from day 1"
@@ -222,6 +222,109 @@ async function runTests() {
   console.log("\nBONUS: Intent classification");
   assert(inferPlanningMode(pragueInput, "Move castle to day 2") === "itinerary_edit", "Classifies edit intent");
   assert(inferPlanningMode(pragueInput, "Make it cheaper") === "budget_optimization", "Classifies budget intent");
+
+  console.log("\nBONUS: Confirmed destination lock");
+  const {
+    applyConfirmedDestination,
+    getConfirmedDestination,
+    knowledgeMatchesConfirmed,
+    parseRegionFromLabel,
+  } = await import("../lib/planning/confirmed-destination");
+  const { buildUserPreferences } = await import("../lib/planning/preferences");
+
+  const charlottePick: TripPlannerInput = {
+    destination: "Charlotte",
+    destinationUnknown: false,
+    destinationCountry: "United States",
+    destinationLabel: "Charlotte, North Carolina, United States",
+    destinationLatitude: 35.2271,
+    destinationLongitude: -80.8431,
+    flexibleDates: true,
+    budget: "$1,000–$2,000",
+    travelers: "Solo",
+    interests: ["Food"],
+    travelStyle: "Comfortable",
+    pace: "Balanced",
+  };
+  const confirmed = getConfirmedDestination(charlottePick);
+  assert(confirmed?.confirmed === true, "treats picker coordinates as a confirmed place");
+  assert(confirmed?.label.includes("North Carolina") === true, "keeps the exact picker label");
+  assert(confirmed?.state === "North Carolina", "parses state from the picker label");
+  const parsed = parseRegionFromLabel("Charlotte, North Carolina, United States");
+  assert(parsed.state === "North Carolina", "splits city/state/country from the confirmed label");
+
+  const prefsLocked = buildUserPreferences(charlottePick, {
+    destination: "Prague",
+    country: "Czech Republic",
+  });
+  assert(prefsLocked.destination === "Charlotte", "confirmed city wins over knowledge-base city");
+  assert(prefsLocked.country === "United States", "confirmed country wins over knowledge-base country");
+
+  const stamped = applyConfirmedDestination(
+    { destination: "Prague", country: "Czech Republic", tripSummary: "x" },
+    confirmed!
+  );
+  assert(stamped.destination === "Charlotte", "stamps the confirmed city onto the plan");
+  assert(stamped.destinationLabel === "Charlotte, North Carolina, United States", "stamps the confirmed label");
+
+  assert(
+    knowledgeMatchesConfirmed(confirmed!, {
+      city: "Paris",
+      country: "France",
+      latitude: 48.8566,
+      longitude: 2.3522,
+    }) === false,
+    "Charlotte does not match Paris knowledge"
+  );
+  assert(
+    knowledgeMatchesConfirmed(
+      {
+        city: "Paris",
+        country: "United States",
+        label: "Paris, Texas, United States",
+        latitude: 33.6609,
+        longitude: -95.5555,
+        confirmed: true,
+      },
+      { city: "Paris", country: "France", latitude: 48.8566, longitude: 2.3522 }
+    ) === false,
+    "Paris Texas does not match Paris France knowledge"
+  );
+  assert(
+    knowledgeMatchesConfirmed(
+      {
+        city: "Prague",
+        country: "Czech Republic",
+        label: "Prague, Czechia",
+        latitude: 50.0755,
+        longitude: 14.4378,
+        confirmed: true,
+      },
+      { city: "Prague", country: "Czech Republic", latitude: 50.0755, longitude: 14.4378 }
+    ) === true,
+    "matching Prague coordinates keep curated knowledge"
+  );
+
+  const parisTexasInput: TripPlannerInput = {
+    destination: "Paris",
+    destinationUnknown: false,
+    destinationCountry: "United States",
+    destinationLabel: "Paris, Texas, United States",
+    destinationLatitude: 33.6609,
+    destinationLongitude: -95.5555,
+    flexibleDates: true,
+    budget: "$1,000–$2,000",
+    travelers: "Solo",
+    interests: ["Food"],
+    travelStyle: "Comfortable",
+    pace: "Balanced",
+  };
+  const parisTexasPipeline = await runPlanningPipeline(parisTexasInput);
+  assert(
+    parisTexasPipeline.retrieved?.destination == null,
+    "does not attach Paris France knowledge to a Paris Texas pick"
+  );
+  assert(parisTexasPipeline.draftItinerary === null, "does not build a Paris France itinerary draft");
 
   console.log(`\n=== RESULTS: ${passed} passed, ${failed} failed ===\n`);
   process.exit(failed > 0 ? 1 : 0);

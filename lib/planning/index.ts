@@ -15,6 +15,7 @@ export type {
 } from "./types";
 
 export { buildEnhancedPlanningContext, inferPlanningMode } from "./context";
+export { buildUserPreferences, formatPreferencesLog, activitiesPerDay } from "./preferences";
 export { rankAttractions, rankTopActivities, scoreAttraction } from "./ranking";
 export { haversineKm, parseDurationMinutes, estimateWalkMinutes, orderByProximity } from "./geo";
 export { buildStructuredItinerary } from "./scheduler";

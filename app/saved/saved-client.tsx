@@ -48,10 +48,13 @@ export default function SavedTripsClient() {
           <Card key={trip.id} className="p-5 hover:border-border-accent transition-colors">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-1">
                   <MapPin className="h-4 w-4 text-foreground-secondary" />
                   <h3 className="font-semibold text-lg text-destination">{trip.destination}</h3>
                 </div>
+                {trip.tripPlan?.destinationLabel && trip.tripPlan.destinationLabel !== trip.destination && (
+                  <p className="text-xs text-muted mb-2">{trip.tripPlan.destinationLabel}</p>
+                )}
                 <div className="flex flex-wrap gap-2 mb-2">
                   <Badge variant="accent">{trip.duration} Days</Badge>
                   <Badge variant="accent">{formatCurrency(trip.estimatedBudget)}</Badge>
