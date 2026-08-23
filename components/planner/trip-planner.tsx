@@ -17,6 +17,7 @@ import { OptionCard } from "@/components/ui/option-card";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
 import { getUserPreferences, setActiveTrip } from "@/lib/storage";
+import { getawayToPlannerInput, getPreplannedGetaway, type PreplannedGetaway } from "@/lib/preplanned-getaways";
 import { INTEREST_META, PACE_META, STYLE_META, TRAVELER_META } from "@/lib/preference-meta";
 import type { TripPlannerInput } from "@/types/trip";
 import {
@@ -73,6 +74,7 @@ export function TripPlanner() {
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [error, setError] = useState("");
   const [customBudgetMode, setCustomBudgetMode] = useState(false);
+  const [getawayTemplate, setGetawayTemplate] = useState<PreplannedGetaway | null>(null);
 
   const destinationSelected =
     !input.destinationUnknown &&
@@ -80,6 +82,20 @@ export function TripPlanner() {
     input.destinationLongitude != null;
 
   useEffect(() => {
+    const getawayId = searchParams.get("getaway");
+    if (getawayId) {
+      const template = getPreplannedGetaway(getawayId);
+      if (template) {
+        setGetawayTemplate(template);
+        setInput(getawayToPlannerInput(template));
+        setCustomBudgetMode(false);
+        setStep(2);
+        track("planner_started", { source: "getaway", getaway: getawayId });
+        return;
+      }
+    }
+
+    setGetawayTemplate(null);
     const prefs = getUserPreferences();
     setInput((prev) => ({
       ...prev,
@@ -88,9 +104,7 @@ export function TripPlanner() {
       pace: prefs.preferredPace,
       interests: prefs.favoriteActivities.length ? [...prefs.favoriteActivities] : prev.interests,
     }));
-  }, []);
 
-  useEffect(() => {
     const dest = searchParams.get("destination");
     if (dest) {
       setInput((prev) => ({ ...prev, destination: dest, destinationUnknown: false }));
@@ -270,20 +284,32 @@ export function TripPlanner() {
         </div>
         <ol className="flex items-center gap-1.5" aria-label="Planner progress">
           {STEP_META.map((item, index) => {
-            const complete = index + 1 < step;
-            const active = index + 1 === step;
+            const stepNumber = index + 1;
+            const complete = stepNumber < step;
+            const active = stepNumber === step;
+            const prefilledAhead = getawayTemplate != null && stepNumber >= 3 && !complete && !active;
             return (
               <li key={item.label} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
                 <span
                   className={cn(
                     "h-1 w-full rounded-full transition-colors duration-300",
-                    complete || active ? "bg-primary" : "bg-surface-hover"
+                    complete || active
+                      ? "bg-primary"
+                      : prefilledAhead
+                        ? "bg-accent/75"
+                        : "bg-surface-hover"
                   )}
                 />
                 <span
                   className={cn(
                     "hidden text-[10px] font-medium tracking-[0.06em] uppercase sm:block",
-                    active ? "text-primary" : complete ? "text-foreground-secondary" : "text-muted"
+                    active
+                      ? "text-primary"
+                      : complete
+                        ? "text-foreground-secondary"
+                        : prefilledAhead
+                          ? "text-accent-text"
+                          : "text-muted"
                   )}
                 >
                   {item.label}
@@ -292,6 +318,13 @@ export function TripPlanner() {
             );
           })}
         </ol>
+        {getawayTemplate ? (
+          <div className="mt-4 rounded-xl border border-accent/40 bg-accent-subtle/30 px-3.5 py-3 text-sm leading-relaxed text-foreground-secondary">
+            Starting from <span className="font-semibold text-foreground">{getawayTemplate.title}</span> in{" "}
+            {getawayTemplate.destination}. Pick your dates below — budget, vibe, and pace are prefilled but you can
+            change anything as you go.
+          </div>
+        ) : null}
         {summaryChips.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {summaryChips.map((chip) => (
@@ -311,6 +344,11 @@ export function TripPlanner() {
         <p className="mt-2 mb-8 max-w-2xl text-sm leading-relaxed text-foreground-secondary sm:text-[15px]">
           {current.subtitle}
         </p>
+        {getawayTemplate && step >= 3 ? (
+          <p className="-mt-6 mb-8 text-xs font-medium text-accent-text">
+            Prefilled from {getawayTemplate.title} — tap another option anytime to change it.
+          </p>
+        ) : null}
 
         {step === 1 && (
           <div className="space-y-4">

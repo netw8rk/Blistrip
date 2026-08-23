@@ -27,6 +27,7 @@ type AnalyticsEvent =
   | "save_trip"
   | "delete_trip"
   | "destination_clicked"
+  | "getaway_started"
   | "affiliate_click";
 
 interface AnalyticsProperties {

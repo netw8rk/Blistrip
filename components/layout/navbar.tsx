@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/layout/logo";
@@ -52,9 +52,59 @@ function NavActions({ pathname, onNavigate }: { pathname: string; onNavigate?: (
 export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const scrollFrameRef = useRef<number | null>(null);
+  const scrollDownDistance = useRef(0);
+
+  useEffect(() => {
+    lastScrollY.current = window.scrollY;
+
+    const onScroll = () => {
+      if (scrollFrameRef.current != null) return;
+
+      scrollFrameRef.current = window.requestAnimationFrame(() => {
+        scrollFrameRef.current = null;
+        const currentY = window.scrollY;
+        const delta = currentY - lastScrollY.current;
+
+        if (currentY <= 12) {
+          setVisible(true);
+          scrollDownDistance.current = 0;
+        } else if (delta > 0) {
+          scrollDownDistance.current += delta;
+          if (scrollDownDistance.current > 48) {
+            setVisible(false);
+            setMobileOpen(false);
+          }
+        } else if (delta < -4) {
+          scrollDownDistance.current = 0;
+          setVisible(true);
+        }
+
+        lastScrollY.current = currentY;
+      });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (scrollFrameRef.current != null) {
+        window.cancelAnimationFrame(scrollFrameRef.current);
+      }
+    };
+  }, []);
+
+  const showNavbar = visible || mobileOpen;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-xl">
+    <header
+      className={cn(
+        "fixed inset-x-0 top-0 z-40 border-b border-border bg-background/90 backdrop-blur-xl",
+        "transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[transform,opacity]",
+        showNavbar ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0 pointer-events-none"
+      )}
+    >
       <nav className="mx-auto flex h-16 max-w-[84rem] items-center justify-between px-4 sm:px-6 lg:px-8">
         <Logo />
 
