@@ -1,6 +1,6 @@
 export const metadata = {
   title: "Profile",
-  description: "Set your travel preferences for personalized trip planning.",
+  description: "Your trips, saved places, travel preferences, and account settings.",
 };
 
 export { default } from "./profile-client";

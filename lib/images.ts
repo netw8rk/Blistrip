@@ -16,6 +16,11 @@ const PHOTOS = {
   rome: "1552832230-c0197dd311b5",
   amsterdam: "1539037116277-4db20889f2d4",
   porto: "1524231757912-21f4fe3a7200",
+  berlin: "156956373903-0eba58a9dc5f",
+  london: "1513635269976-596596e85872",
+  istanbul: "1527838837400-f6fa97804a73",
+  tokyo: "1540959733332-eab4de981c90",
+  newYork: "1496442226666-8d-d88388405613",
   europeStreet: "1499856871958-5b9627545d1a",
   travelFlatlay: "1488646953014-85cb44e25828",
   travelersPlanning: "1586022045076-aee0a185180b",
@@ -50,6 +55,11 @@ const destinationPhotoMap: Record<string, string> = {
   rome: PHOTOS.rome,
   amsterdam: PHOTOS.amsterdam,
   porto: PHOTOS.porto,
+  berlin: PHOTOS.berlin,
+  london: PHOTOS.london,
+  istanbul: PHOTOS.istanbul,
+  tokyo: PHOTOS.tokyo,
+  newyork: PHOTOS.newYork,
 };
 
 export function getDestinationImage(destination: string, width = 800): string {
@@ -94,13 +104,31 @@ export function getPlaceFallbackImage(placeName: string, destination?: string, w
   return getImageUrl(photoId, width);
 }
 
-export const popularDestinations = [
-  { name: "Prague", country: "Czech Republic", photoId: PHOTOS.prague },
-  { name: "Budapest", country: "Hungary", photoId: PHOTOS.budapest },
-  { name: "Paris", country: "France", photoId: PHOTOS.paris },
-  { name: "Barcelona", country: "Spain", photoId: PHOTOS.barcelona },
-  { name: "Rome", country: "Italy", photoId: PHOTOS.rome },
-] as const;
+export type PopularDestination = {
+  name: string;
+  country: string;
+  photoId: string;
+  latitude: number;
+  longitude: number;
+};
+
+export const popularDestinations: PopularDestination[] = [
+  { name: "Prague", country: "Czech Republic", photoId: PHOTOS.prague, latitude: 50.0755, longitude: 14.4378 },
+  { name: "Budapest", country: "Hungary", photoId: PHOTOS.budapest, latitude: 47.4979, longitude: 19.0402 },
+  { name: "Kraków", country: "Poland", photoId: PHOTOS.krakow, latitude: 50.0647, longitude: 19.9450 },
+  { name: "Vienna", country: "Austria", photoId: PHOTOS.vienna, latitude: 48.2082, longitude: 16.3738 },
+  { name: "Paris", country: "France", photoId: PHOTOS.paris, latitude: 48.8566, longitude: 2.3522 },
+  { name: "Barcelona", country: "Spain", photoId: PHOTOS.barcelona, latitude: 41.3874, longitude: 2.1686 },
+  { name: "Lisbon", country: "Portugal", photoId: PHOTOS.lisbon, latitude: 38.7223, longitude: -9.1393 },
+  { name: "Rome", country: "Italy", photoId: PHOTOS.rome, latitude: 41.9028, longitude: 12.4964 },
+  { name: "Amsterdam", country: "Netherlands", photoId: PHOTOS.amsterdam, latitude: 52.3676, longitude: 4.9041 },
+  { name: "Porto", country: "Portugal", photoId: PHOTOS.porto, latitude: 41.1579, longitude: -8.6291 },
+  { name: "Berlin", country: "Germany", photoId: PHOTOS.berlin, latitude: 52.52, longitude: 13.405 },
+  { name: "London", country: "United Kingdom", photoId: PHOTOS.london, latitude: 51.5074, longitude: -0.1278 },
+  { name: "Istanbul", country: "Turkey", photoId: PHOTOS.istanbul, latitude: 41.0082, longitude: 28.9784 },
+  { name: "Tokyo", country: "Japan", photoId: PHOTOS.tokyo, latitude: 35.6762, longitude: 139.6503 },
+  { name: "New York", country: "United States", photoId: PHOTOS.newYork, latitude: 40.7128, longitude: -74.006 },
+];
 
 export function getPopularDestinationImage(photoId: string, width = 400): string {
   return getImageUrl(photoId, width);

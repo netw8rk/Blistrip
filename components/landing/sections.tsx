@@ -76,27 +76,28 @@ export function HeroSection() {
 
           <span className="absolute left-5 top-5 z-20 inline-flex w-fit items-center gap-1.5 rounded-full border border-border/80 bg-surface/75 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur-md sm:left-6 sm:top-6 sm:text-[14px] lg:left-8 lg:top-8">
             <Sparkles className="h-3.5 w-3.5 text-foreground" />
-            AI-powered travel planning
+            Trips built around you
           </span>
 
           <div className="relative z-10 flex h-full min-h-[520px] sm:min-h-[540px] lg:min-h-[580px] flex-col justify-end p-5 sm:p-6 lg:p-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
             <div className="flex max-w-md shrink-0 flex-col gap-5 sm:gap-6 lg:max-w-lg">
               <div>
-                <h1 className="mb-2 text-2xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-3xl lg:text-4xl">
-                  Your trip,
+                <h1 className="mb-3 text-2xl font-semibold leading-[1.12] tracking-tight text-foreground sm:text-3xl lg:text-4xl">
+                  A trip plan that
                   <br />
-                  <span className="text-gradient">planned in minutes.</span>
+                  <span className="text-gradient">fits how you travel.</span>
                 </h1>
-                <p className="max-w-sm text-base leading-snug text-foreground sm:text-lg">
-                  Budget, dates, vibe — tell Blistrip what matters and get a full itinerary built around you.
+                <p className="max-w-md text-[15px] leading-relaxed text-foreground-secondary sm:text-base sm:leading-relaxed">
+                  Share your destination, budget, and interests. Blistrip puts together neighborhoods, stays, and a
+                  day-by-day itinerary — with real places, not filler.
                 </p>
               </div>
 
               <div className="flex max-w-sm items-center gap-4 sm:gap-6">
                 {[
-                  { value: "8", label: "Step planner" },
-                  { value: "10+", label: "Destinations" },
-                  { value: "60s", label: "To your plan" },
+                  { value: "8", label: "Quick questions" },
+                  { value: "15+", label: "Popular cities" },
+                  { value: "~1 min", label: "To your plan" },
                 ].map((stat) => (
                   <div key={stat.label}>
                     <p className="text-base sm:text-lg font-semibold text-foreground tabular-nums">{stat.value}</p>
@@ -114,7 +115,7 @@ export function HeroSection() {
                 </Link>
                 <Link href="/explore">
                   <Button variant="secondary" className="w-full sm:w-auto h-10 px-5">
-                    Explore Destinations
+                    Browse destinations
                   </Button>
                 </Link>
               </div>
@@ -122,17 +123,22 @@ export function HeroSection() {
 
             <div className="mt-5 w-full shrink-0 sm:max-w-md lg:mt-0 lg:max-w-none lg:w-[400px] xl:w-[440px]">
               <div className="hero-glass p-6 sm:p-7">
-                <p className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-muted">Quick Plan</p>
-                <h2 className="mb-5 text-lg font-semibold text-foreground">Pick a trip style</h2>
+                <p className="mb-1 text-xs font-medium uppercase tracking-[0.1em] text-primary font-sub">Start here</p>
+                <h2 className="mb-2 text-lg font-semibold leading-snug text-foreground sm:text-xl">
+                  What are you in the mood for?
+                </h2>
+                <p className="mb-5 text-sm leading-relaxed text-foreground-secondary">
+                  Pick a vibe below — you can fine-tune dates, budget, and pace in the planner.
+                </p>
                 <div className="mb-5 grid grid-cols-2 gap-3">
                   <QuickPlanChip icon={Mountain} label="City break" />
                   <QuickPlanChip icon={UtensilsCrossed} label="Food & culture" />
                   <QuickPlanChip icon={Palmtree} label="Beach escape" />
-                  <QuickPlanChip icon={Users} label="Group trip" />
+                  <QuickPlanChip icon={Users} label="Trip with friends" />
                 </div>
                 <Link href="/planner">
                   <Button className="h-11 w-full text-base">
-                    Start Planning
+                    Create my plan
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>

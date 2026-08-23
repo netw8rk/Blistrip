@@ -213,6 +213,23 @@ export interface UserPreferences {
   preferredPace: string;
 }
 
+export interface UserProfile {
+  displayName: string;
+  email: string;
+}
+
+export const DEFAULT_USER_PREFERENCES: UserPreferences = {
+  travelStyle: "Comfortable",
+  budgetPreference: "$150–$250/night",
+  favoriteActivities: [],
+  preferredPace: "Balanced",
+};
+
+export const DEFAULT_USER_PROFILE: UserProfile = {
+  displayName: "Traveler",
+  email: "",
+};
+
 export const TRAVELER_OPTIONS = ["Solo", "Couple", "Friends", "Family"] as const;
 export const BUDGET_OPTIONS = [
   "Under $80/night",

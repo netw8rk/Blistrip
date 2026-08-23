@@ -1,10 +1,12 @@
 "use client";
 
-import type { TripPlan, SavedTrip, UserPreferences } from "@/types/trip";
+import type { TripPlan, SavedTrip, UserPreferences, UserProfile } from "@/types/trip";
+import { DEFAULT_USER_PREFERENCES, DEFAULT_USER_PROFILE } from "@/types/trip";
 
 const TRIPS_KEY = "blistrip_trips";
 const SAVED_KEY = "blistrip_saved_trips";
 const PREFS_KEY = "blistrip_user_preferences";
+const PROFILE_KEY = "blistrip_user_profile";
 const ACTIVE_KEY = "blistrip_active_trip";
 const FRESH_KEY = "blistrip_fresh_trip_id";
 
@@ -70,36 +72,36 @@ export function isTripSaved(id: string): boolean {
 
 export function getUserPreferences(): UserPreferences {
   if (typeof window === "undefined") {
-    return {
-      travelStyle: "Comfortable",
-      budgetPreference: "$150–$250/night",
-      favoriteActivities: [],
-      preferredPace: "Balanced",
-    };
+    return DEFAULT_USER_PREFERENCES;
   }
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    return raw
-      ? JSON.parse(raw)
-      : {
-          travelStyle: "Comfortable",
-          budgetPreference: "$150–$250/night",
-          favoriteActivities: [],
-          preferredPace: "Balanced",
-        };
+    return raw ? JSON.parse(raw) : DEFAULT_USER_PREFERENCES;
   } catch {
-    return {
-      travelStyle: "Comfortable",
-      budgetPreference: "$150–$250/night",
-      favoriteActivities: [],
-      preferredPace: "Balanced",
-    };
+    return DEFAULT_USER_PREFERENCES;
   }
 }
 
 export function saveUserPreferences(prefs: UserPreferences): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+}
+
+export function getUserProfile(): UserProfile {
+  if (typeof window === "undefined") {
+    return DEFAULT_USER_PROFILE;
+  }
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? { ...DEFAULT_USER_PROFILE, ...JSON.parse(raw) } : DEFAULT_USER_PROFILE;
+  } catch {
+    return DEFAULT_USER_PROFILE;
+  }
+}
+
+export function saveUserProfile(profile: UserProfile): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
 }
 
 export function setSessionTrip(trip: TripPlan): void {

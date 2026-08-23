@@ -28,7 +28,7 @@ import {
   deleteSavedTrip,
   setActiveTrip,
 } from "@/lib/storage";
-import type { ActivityRecommendation, ItineraryActivity, RestaurantRecommendation, TripPlan } from "@/types/trip";
+import type { ActivityRecommendation, DailyItinerary, ItineraryActivity, RestaurantRecommendation, TripPlan } from "@/types/trip";
 import { getHeroDestinationImage, getPlaceFallbackImage } from "@/lib/images";
 import { writeDayGuideNote } from "@/lib/travel/day-guide";
 import { googleHeroPhotoSrc, googlePlacePageUrl, isGooglePhotoSrc, withGooglePhotoWidth } from "@/lib/travel/google-links";
@@ -42,6 +42,12 @@ import {
   type DaySlot,
 } from "@/components/trip/add-to-itinerary";
 
+const PHOTO_CARD_CAPTION_GRADIENT =
+  "linear-gradient(to top, #f4f0e7 0%, #f4f0e7 42%, rgba(244,240,231,0.92) 62%, rgba(244,240,231,0.4) 82%, transparent 100%)";
+
+const TOP_RATED_GRID_FADE =
+  "linear-gradient(to top, var(--color-background) 0%, rgba(244,240,231,0.96) 40%, transparent 100%)";
+
 interface TripResultsProps {
   tripId: string;
 }
@@ -52,6 +58,7 @@ export function TripResults({ tripId }: TripResultsProps) {
   const [ready, setReady] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showExtras, setShowExtras] = useState(false);
+  const [showAllTopRated, setShowAllTopRated] = useState(false);
   const [activityTypeFilter, setActivityTypeFilter] = useState("all");
   const [whyDialog, setWhyDialog] = useState<{ title: string; reason: string } | null>(null);
   const [heroPhotoUrl, setHeroPhotoUrl] = useState<string | undefined>();
@@ -137,6 +144,10 @@ export function TripResults({ tripId }: TripResultsProps) {
     }
   }, [activityTypeFilter, activityTypes]);
 
+  useEffect(() => {
+    setShowAllTopRated(false);
+  }, [activityTypeFilter]);
+
   const addRecommendation = (stop: ItineraryActivity, day: number, slot: DaySlot) => {
     if (!trip) return;
     persist(addStopToTrip(trip, stop, day, slot));
@@ -171,6 +182,7 @@ export function TripResults({ tripId }: TripResultsProps) {
   const totalBudget = Object.values(trip.budgetBreakdown).reduce((a, b) => a + b, 0);
   const dailyAvg = Math.round(totalBudget / trip.duration);
   const placeLabel = trip.destinationLabel || [trip.destination, trip.country].filter(Boolean).join(", ");
+  const hasMoreTopRated = visibleActivities.length > 4;
 
   return (
     <div className="animate-fade-in">
@@ -209,49 +221,54 @@ export function TripResults({ tripId }: TripResultsProps) {
           />
         </div>
 
-        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 pt-5 pb-2">
-          {placeLabel && (
-            trip.destinationLatitude != null && trip.destinationLongitude != null ? (
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${trip.destinationLatitude},${trip.destinationLongitude}`}
-                target="_blank"
-                rel="noreferrer"
-                className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium uppercase tracking-[0.16em] text-foreground-secondary hover:text-primary transition-colors"
-              >
-                <MapPin className="h-3.5 w-3.5" />
-                {locationSubtitle(trip.destination, placeLabel)}
-              </a>
-            ) : (
-              <p className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium uppercase tracking-[0.16em] text-foreground-secondary">
-                <MapPin className="h-3.5 w-3.5" />
-                {locationSubtitle(trip.destination, placeLabel)}
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 pt-5 pb-4">
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)] lg:gap-8">
+            <div>
+              {placeLabel && (
+                trip.destinationLatitude != null && trip.destinationLongitude != null ? (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${trip.destinationLatitude},${trip.destinationLongitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium uppercase tracking-[0.16em] text-foreground-secondary hover:text-primary transition-colors"
+                  >
+                    <MapPin className="h-3.5 w-3.5" />
+                    {locationSubtitle(trip.destination, placeLabel)}
+                  </a>
+                ) : (
+                  <p className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium uppercase tracking-[0.16em] text-foreground-secondary">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {locationSubtitle(trip.destination, placeLabel)}
+                  </p>
+                )
+              )}
+              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-destination leading-[1.1] mb-3">
+                {trip.destination}
+              </h1>
+              <p className="text-lg text-foreground">
+                {[
+                  `${trip.duration} days`,
+                  trip.dates && trip.dates !== "Flexible dates" ? trip.dates : null,
+                  formatCurrency(trip.estimatedBudget),
+                  trip.travelStyle,
+                  trip.interests.slice(0, 2).join(" & "),
+                ]
+                  .filter(Boolean)
+                  .join("  ·  ")}
               </p>
-            )
-          )}
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-destination leading-[1.1] mb-3">
-            {trip.destination}
-          </h1>
-          <p className="text-lg text-foreground">
-            {[
-              `${trip.duration} days`,
-              trip.dates && trip.dates !== "Flexible dates" ? trip.dates : null,
-              formatCurrency(trip.estimatedBudget),
-              trip.travelStyle,
-              trip.interests.slice(0, 2).join(" & "),
-            ]
-              .filter(Boolean)
-              .join("  ·  ")}
-          </p>
-          {trip.tripSummary && (
-            <p className="mt-4 max-w-2xl text-base leading-7 text-foreground-secondary">
-              {trip.tripSummary}
-            </p>
-          )}
+              {trip.tripSummary && (
+                <p className="mt-4 max-w-2xl text-base leading-7 text-foreground-secondary">
+                  {trip.tripSummary}
+                </p>
+              )}
+            </div>
+            <TripRefinePanel trip={trip} onUpdate={persist} embedded />
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 pt-8 pb-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 pt-2 pb-8">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
             { label: "Trip estimate", value: formatCurrency(totalBudget) },
             {
@@ -399,7 +416,7 @@ export function TripResults({ tripId }: TripResultsProps) {
       <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
         <p className="eyebrow mb-2">More options</p>
         <h2 className="text-2xl sm:text-3xl font-bold mb-2">Top Rated Places</h2>
-        <p className="text-base text-muted mb-6">
+        <p className="text-base text-muted mb-6 max-w-xl">
           Highly rated restaurants, bars, parks, and sights you can add to any day.
         </p>
         {activityTypes.length > 1 && (
@@ -426,54 +443,96 @@ export function TripResults({ tripId }: TripResultsProps) {
             No {activityTypeFilter === "all" ? "" : `${activityTypeFilter.toLowerCase()} `}places on this trip.
           </p>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-            {visibleActivities.map((activity) => (
-              <RecommendationCard
-                key={`${activity.providerPlaceId ?? activity.name}`}
-                title={activity.name}
-                category={placeCategoryLabel(activity)}
-                line={[activity.address || activity.description, activity.price && activity.price !== "Check locally" ? activity.price : ""]
-                  .filter(Boolean)
-                  .join(" · ")}
-                rating={activity.rating}
-                reviewCount={activity.reviewCount}
-                photoUrl={activity.photoUrl}
-                fallbackImage={getPlaceFallbackImage(activity.name, trip.destination, 1600)}
-                mapsUrl={googlePlacePageUrl(activity)}
-                alreadyAdded={placeAlreadyOnTrip(trip, activity.name, activity.providerPlaceId)}
-                onAdd={(day, slot) => addRecommendation(activityToStop(activity), day, slot)}
-                trip={trip}
-              />
-            ))}
-          </div>
+          <>
+            <div className="relative">
+              <div
+                className={cn(
+                  "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4",
+                  !showAllTopRated &&
+                    hasMoreTopRated &&
+                    "overflow-hidden max-h-[27rem] sm:max-h-[28rem] lg:max-h-[24rem] xl:max-h-[22rem]"
+                )}
+              >
+                {visibleActivities.map((activity) => (
+                  <RecommendationCard
+                    key={`${activity.providerPlaceId ?? activity.name}`}
+                    title={activity.name}
+                    category={placeCategoryLabel(activity)}
+                    line={[activity.address || activity.description, activity.price && activity.price !== "Check locally" ? activity.price : ""]
+                      .filter(Boolean)
+                      .join(" · ")}
+                    rating={activity.rating}
+                    reviewCount={activity.reviewCount}
+                    photoUrl={activity.photoUrl}
+                    fallbackImage={getPlaceFallbackImage(activity.name, trip.destination, 1600)}
+                    mapsUrl={googlePlacePageUrl(activity)}
+                    alreadyAdded={placeAlreadyOnTrip(trip, activity.name, activity.providerPlaceId)}
+                    onAdd={(day, slot) => addRecommendation(activityToStop(activity), day, slot)}
+                    trip={trip}
+                  />
+                ))}
+              </div>
+              {!showAllTopRated && hasMoreTopRated && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24"
+                  style={{ background: TOP_RATED_GRID_FADE }}
+                />
+              )}
+            </div>
+            {hasMoreTopRated && (
+              <div className="mt-6 flex justify-center">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowAllTopRated((value) => !value)}
+                >
+                  {showAllTopRated ? "Show less" : "See more"}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </section>
 
       <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
-        <p className="eyebrow mb-2">Budget</p>
-        <h2 className="text-2xl font-bold mb-2">Estimate</h2>
-        <p className="text-base text-muted mb-6">Planning figures only — not live prices.</p>
-        {trip.nightlyStayBudget && trip.stayNights ? (
-          <p className="text-sm text-foreground-secondary mb-4 max-w-lg">
-            Stays are based on {formatCurrency(trip.nightlyStayBudget)}/night
-            {trip.stayRooms && trip.stayRooms > 1 ? ` × ${trip.stayRooms} rooms` : ""} × {trip.stayNights} night
-            {trip.stayNights === 1 ? "" : "s"}
-            {` = ${formatCurrency(trip.budgetBreakdown.accommodation)}`}.
-          </p>
-        ) : null}
-        <Card className="p-6 max-w-lg">
-          <div className="space-y-4">
-            <BudgetBar label="Accommodation" amount={trip.budgetBreakdown.accommodation} total={totalBudget} color="bg-accent" />
-            <BudgetBar label="Food" amount={trip.budgetBreakdown.food} total={totalBudget} color="bg-accent/70" />
-            <BudgetBar label="Activities" amount={trip.budgetBreakdown.activities} total={totalBudget} color="bg-accent/50" />
-            <BudgetBar label="Transportation" amount={trip.budgetBreakdown.transportation} total={totalBudget} color="bg-accent/35" />
-            <BudgetBar label="Other" amount={trip.budgetBreakdown.other} total={totalBudget} color="bg-muted" />
+        <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-12">
+          <div>
+            <p className="eyebrow mb-2">Budget</p>
+            <h2 className="text-2xl font-bold mb-2">Estimate</h2>
+            <p className="text-base text-muted mb-6">Planning figures only — not live prices.</p>
+            {trip.nightlyStayBudget && trip.stayNights ? (
+              <p className="text-sm text-foreground-secondary mb-4 max-w-lg">
+                Stays are based on {formatCurrency(trip.nightlyStayBudget)}/night
+                {trip.stayRooms && trip.stayRooms > 1 ? ` × ${trip.stayRooms} rooms` : ""} × {trip.stayNights} night
+                {trip.stayNights === 1 ? "" : "s"}
+                {` = ${formatCurrency(trip.budgetBreakdown.accommodation)}`}.
+              </p>
+            ) : null}
+            <Card className="p-6 max-w-lg">
+              <div className="space-y-4">
+                <BudgetBar label="Accommodation" amount={trip.budgetBreakdown.accommodation} total={totalBudget} color="bg-accent" />
+                <BudgetBar label="Food" amount={trip.budgetBreakdown.food} total={totalBudget} color="bg-accent/70" />
+                <BudgetBar label="Activities" amount={trip.budgetBreakdown.activities} total={totalBudget} color="bg-accent/50" />
+                <BudgetBar label="Transportation" amount={trip.budgetBreakdown.transportation} total={totalBudget} color="bg-accent/35" />
+                <BudgetBar label="Other" amount={trip.budgetBreakdown.other} total={totalBudget} color="bg-muted" />
+              </div>
+              <div className="mt-5 pt-4 border-t border-border flex justify-between text-base">
+                <span>Total</span>
+                <span className="font-semibold text-stat">{formatCurrency(totalBudget)}</span>
+              </div>
+            </Card>
           </div>
-          <div className="mt-5 pt-4 border-t border-border flex justify-between text-base">
-            <span>Total</span>
-            <span className="font-semibold text-stat">{formatCurrency(totalBudget)}</span>
+
+          <div>
+            <p className="eyebrow mb-2">Your trip</p>
+            <h2 className="text-2xl font-bold mb-2">Day-by-day rundown</h2>
+            <p className="text-base text-muted mb-6 max-w-lg">
+              Every stop in your plan, grouped by time of day.
+            </p>
+            <TripDayRundown days={trip.dailyItinerary} />
           </div>
-        </Card>
+        </div>
       </section>
 
       <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-10 border-t border-border pb-16">
@@ -544,8 +603,6 @@ export function TripResults({ tripId }: TripResultsProps) {
         )}
       </section>
 
-      <TripRefinePanel trip={trip} onUpdate={(next) => persist(next)} />
-
       <SimpleDialog open={!!whyDialog} onOpenChange={() => setWhyDialog(null)} title={whyDialog?.title ?? ""}>
         {whyDialog?.reason}
       </SimpleDialog>
@@ -559,6 +616,61 @@ function locationSubtitle(destination: string, label: string): string {
     return label.slice(dest.length).replace(/^,\s*/, "") || label;
   }
   return label;
+}
+
+function TripDayRundown({ days }: { days: DailyItinerary[] }) {
+  return (
+    <div className="space-y-3">
+      {days.map((day) => (
+        <Card key={day.day} className="p-4 sm:p-5 hover:border-border-accent transition-all">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent border border-accent/40 text-accent-text text-sm font-semibold">
+              {day.day}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="subcontainer-title mb-2.5 leading-snug">{day.title}</h4>
+              <div className="space-y-2">
+                <TripDaySlotRundown label="AM" stops={day.morning} />
+                <TripDaySlotRundown label="PM" stops={day.afternoon} />
+                <TripDaySlotRundown label="EVE" stops={day.evening} />
+              </div>
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function TripDaySlotRundown({
+  label,
+  stops,
+}: {
+  label: string;
+  stops: ItineraryActivity[];
+}) {
+  return (
+    <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-x-3 text-sm leading-snug sm:grid-cols-[3.5rem_minmax(0,1fr)]">
+      <span className="pt-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-foreground-secondary sm:text-[13px]">
+        {label}
+      </span>
+      <div className="min-w-0 text-muted">
+        {stops.length === 0 ? (
+          <span>Open</span>
+        ) : stops.length === 1 ? (
+          <span className="text-highlight">{stops[0].name}</span>
+        ) : (
+          <div className="space-y-1">
+            {stops.map((stop, index) => (
+              <p key={`${stop.providerPlaceId ?? stop.name}-${index}`} className="text-highlight">
+                {stop.name}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function resolveStopPhoto(trip: TripPlan, stop: ItineraryActivity): string | undefined {
@@ -596,7 +708,7 @@ function PhotoPlaceCard({
   actions?: ReactNode;
 }) {
   return (
-    <article className="group relative overflow-hidden rounded-[var(--radius-card)] isolate">
+    <article className="group relative overflow-hidden rounded-[var(--radius-card)] border border-border/70 isolate">
       <div className="relative aspect-[5/4]">
         <Image
           src={withGooglePhotoWidth(photoSrc, 900) || photoSrc}
@@ -606,13 +718,6 @@ function PhotoPlaceCard({
           className="object-cover"
           sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw"
           quality={85}
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to top, #f4f0e7 0%, #f4f0e7 18%, rgba(244,240,231,0.9) 36%, rgba(244,240,231,0.45) 58%, rgba(244,240,231,0) 78%)",
-          }}
         />
         {category && (
           <Badge variant="secondary" className="absolute top-2 left-2 z-10 bg-background/90 text-xs">
@@ -629,7 +734,10 @@ function PhotoPlaceCard({
             <X className="h-3.5 w-3.5" />
           </button>
         )}
-        <div className="absolute inset-x-0 bottom-0 z-10 p-3">
+        <div
+          className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-10"
+          style={{ background: PHOTO_CARD_CAPTION_GRADIENT }}
+        >
           <h3 className="text-[15px] font-semibold leading-5 text-foreground line-clamp-2">{title}</h3>
           {line && <p className="mt-0.5 text-xs leading-4 text-foreground-secondary line-clamp-1">{line}</p>}
           {rating != null && rating > 0 && (

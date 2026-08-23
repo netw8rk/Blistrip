@@ -5,40 +5,19 @@ import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
-  Backpack,
-  Building2,
   CalendarDays,
-  Check,
   Compass,
-  Gem,
-  Heart,
-  Landmark,
-  Layers,
   Loader2,
-  MapPinned,
-  Mountain,
-  Palette,
-  Palmtree,
-  ShoppingBag,
-  Sparkles,
-  Trees,
-  Trophy,
-  User,
-  Users,
-  UsersRound,
-  UtensilsCrossed,
   Wallet,
-  Waves,
-  Wine,
-  Zap,
-  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { OptionCard } from "@/components/ui/option-card";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
-import { setActiveTrip } from "@/lib/storage";
+import { getUserPreferences, setActiveTrip } from "@/lib/storage";
+import { INTEREST_META, PACE_META, STYLE_META, TRAVELER_META } from "@/lib/preference-meta";
 import type { TripPlannerInput } from "@/types/trip";
 import {
   BUDGET_OPTIONS,
@@ -71,42 +50,6 @@ const LOADING_MESSAGES = [
   "Putting your trip together...",
 ];
 
-const TRAVELER_META: Record<string, { icon: LucideIcon; hint: string }> = {
-  Solo: { icon: User, hint: "Just you" },
-  Couple: { icon: Heart, hint: "Two of you" },
-  Friends: { icon: Users, hint: "A group trip" },
-  Family: { icon: UsersRound, hint: "Kids or relatives" },
-};
-
-const INTEREST_META: Record<string, LucideIcon> = {
-  Nightlife: Wine,
-  History: Landmark,
-  Food: UtensilsCrossed,
-  Culture: Palette,
-  Nature: Trees,
-  Beaches: Palmtree,
-  Adventure: Mountain,
-  Relaxation: Waves,
-  Shopping: ShoppingBag,
-  Sports: Trophy,
-  Architecture: Building2,
-  "Local experiences": MapPinned,
-};
-
-const STYLE_META: Record<string, { icon: LucideIcon; hint: string }> = {
-  Budget: { icon: Wallet, hint: "Value stays and local eats" },
-  Comfortable: { icon: Sparkles, hint: "Nice hotels, balanced spend" },
-  Luxury: { icon: Gem, hint: "Top stays and experiences" },
-  Backpacker: { icon: Backpack, hint: "Hostels and cheap eats" },
-  "Mix of everything": { icon: Layers, hint: "A bit of each" },
-};
-
-const PACE_META: Record<string, { icon: LucideIcon; hint: string }> = {
-  "Slow and relaxed": { icon: Waves, hint: "Fewer stops, more time" },
-  Balanced: { icon: CalendarDays, hint: "A full day without rushing" },
-  "Pack everything in": { icon: Zap, hint: "See as much as you can" },
-};
-
 const initialInput: TripPlannerInput = {
   destination: "",
   destinationUnknown: false,
@@ -122,68 +65,6 @@ const initialInput: TripPlannerInput = {
   additionalNotes: "",
 };
 
-function OptionCard({
-  selected,
-  onClick,
-  icon: Icon,
-  label,
-  hint,
-  compact,
-  className,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  icon?: LucideIcon;
-  label: string;
-  hint?: string;
-  compact?: boolean;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={cn(
-        "group relative flex w-full text-left transition-all duration-200 rounded-xl border",
-        compact ? "items-center gap-2.5 px-3 py-2.5" : "items-start gap-3 px-3.5 py-3",
-        selected
-          ? "border-border-accent bg-primary-muted shadow-[0_0_0_1px_rgba(169,149,214,0.2)]"
-          : "border-border/70 bg-background/60 hover:border-border hover:bg-surface/80",
-        className
-      )}
-    >
-      {Icon ? (
-        <span
-          className={cn(
-            "flex shrink-0 items-center justify-center rounded-lg border transition-colors",
-            compact ? "h-7 w-7" : "mt-0.5 h-8 w-8",
-            selected
-              ? "border-border-accent bg-background/70 text-primary"
-              : "border-border/60 bg-background/50 text-muted group-hover:text-foreground-secondary"
-          )}
-        >
-          <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
-        </span>
-      ) : null}
-      <span className="min-w-0 flex-1">
-        <span className={cn("block text-sm font-medium leading-snug", selected ? "text-foreground" : "text-foreground-secondary")}>
-          {label}
-        </span>
-        {hint ? <span className="mt-0.5 block text-xs text-muted leading-snug">{hint}</span> : null}
-      </span>
-      {!compact ? (
-        <Check
-          className={cn(
-            "mt-1 h-4 w-4 shrink-0 transition-opacity",
-            selected ? "text-primary opacity-100" : "opacity-0"
-          )}
-        />
-      ) : null}
-    </button>
-  );
-}
-
 export function TripPlanner() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
@@ -197,6 +78,17 @@ export function TripPlanner() {
     !input.destinationUnknown &&
     input.destinationLatitude != null &&
     input.destinationLongitude != null;
+
+  useEffect(() => {
+    const prefs = getUserPreferences();
+    setInput((prev) => ({
+      ...prev,
+      budget: prefs.budgetPreference,
+      travelStyle: prefs.travelStyle,
+      pace: prefs.preferredPace,
+      interests: prefs.favoriteActivities.length ? [...prefs.favoriteActivities] : prev.interests,
+    }));
+  }, []);
 
   useEffect(() => {
     const dest = searchParams.get("destination");
