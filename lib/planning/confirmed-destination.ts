@@ -94,5 +94,5 @@ export function applyConfirmedDestination<T extends Partial<TripPlan>>(
 
 export function mapsUrlForDestination(confirmed: Pick<ConfirmedDestination, "latitude" | "longitude" | "label">): string | undefined {
   if (confirmed.latitude == null || confirmed.longitude == null) return undefined;
-  return `https://www.openstreetmap.org/?mlat=${confirmed.latitude}&mlon=${confirmed.longitude}#map=12/${confirmed.latitude}/${confirmed.longitude}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${confirmed.latitude},${confirmed.longitude}`)}`;
 }

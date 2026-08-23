@@ -7,6 +7,7 @@ import type {
 import type { PlannedActivity, StructuredItineraryDraft } from "@/lib/planning/types";
 import type { NormalizedHotel, NormalizedPlace } from "./types";
 import { OpenStreetMapProvider, type CityPlaceCatalog } from "./providers/openstreetmap";
+import { GooglePlacesProvider } from "./providers/google-places";
 
 export interface VerifiedTripPlaces {
   city: string;
@@ -20,6 +21,7 @@ export interface VerifiedTripPlaces {
 }
 
 const osm = new OpenStreetMapProvider();
+const google = new GooglePlacesProvider();
 
 export async function fetchVerifiedTripPlaces(
   city: string,
@@ -28,21 +30,71 @@ export async function fetchVerifiedTripPlaces(
 ): Promise<VerifiedTripPlaces | null> {
   if (!city.trim()) return null;
 
+  if (google.isConfigured()) {
+    const catalog = await googleCityCatalog(city, country);
+    if (catalog && hasAnyPlaces(catalog)) {
+      return catalogToVerified(catalog, city, country, interests, "google_places");
+    }
+  }
+
   const catalog = await osm.getCatalog(city, country);
   if (catalog && hasAnyPlaces(catalog)) {
-    return {
-      city: catalog.city || city,
-      country: catalog.country || country || "",
-      restaurants: pickForInterests(catalog.restaurants, interests, 8),
-      hotels: catalog.hotels.slice(0, 4),
-      attractions: pickForInterests(catalog.attractions, interests, 12),
-      bars: catalog.bars.slice(0, 6),
-      cafes: catalog.cafes.slice(0, 4),
-      provider: "openstreetmap",
-    };
+    return catalogToVerified(catalog, city, country, interests, "openstreetmap");
   }
 
   return null;
+}
+
+function catalogToVerified(
+  catalog: CityPlaceCatalog,
+  city: string,
+  country: string | undefined,
+  interests: string[],
+  provider: string
+): VerifiedTripPlaces {
+  return {
+    city: catalog.city || city,
+    country: catalog.country || country || "",
+    restaurants: pickForInterests(catalog.restaurants, interests, 8),
+    hotels: catalog.hotels.slice(0, 4),
+    attractions: pickForInterests(catalog.attractions, interests, 12),
+    bars: catalog.bars.slice(0, 6),
+    cafes: catalog.cafes.slice(0, 4),
+    provider,
+  };
+}
+
+async function googleCityCatalog(city: string, country?: string): Promise<CityPlaceCatalog | null> {
+  const geo = await google.resolveCityLocation(city, country);
+  if (!geo) return null;
+  const base = {
+    city: geo.city || city,
+    country: geo.country || country,
+    latitude: geo.latitude,
+    longitude: geo.longitude,
+    radiusMeters: 30000,
+    limit: 12,
+  };
+  const [restaurants, cafes, bars, hotels, attractions] = await Promise.all([
+    google.searchPlaces({ ...base, query: `restaurants in ${city}`, type: "restaurant" }),
+    google.searchPlaces({ ...base, query: `cafes in ${city}`, type: "cafe" }),
+    google.searchPlaces({ ...base, query: `bars in ${city}`, type: "bar" }),
+    google.searchPlaces({ ...base, query: `hotels in ${city}`, type: "hotel" }),
+    google.searchPlaces({ ...base, query: `attractions in ${city}`, type: "attraction" }),
+  ]);
+  return {
+    city: geo.city || city,
+    country: geo.country || country || "",
+    latitude: geo.latitude,
+    longitude: geo.longitude,
+    restaurants: restaurants.places,
+    cafes: cafes.places,
+    bars: bars.places,
+    hotels: hotels.places.filter((place): place is CityPlaceCatalog["hotels"][number] =>
+      place.type === "hotel" || place.type === "hostel" || place.type === "apartment"
+    ),
+    attractions: attractions.places,
+  };
 }
 
 function hasAnyPlaces(catalog: CityPlaceCatalog): boolean {

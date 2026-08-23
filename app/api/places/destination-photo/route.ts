@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GooglePlacesProvider } from "@/lib/travel/providers/google-places";
+import { cityHeroQueries, pickCityHeroPhoto } from "@/lib/travel/city-hero-photo";
 
 export async function GET(request: NextRequest) {
   const city = request.nextUrl.searchParams.get("city")?.trim() ?? "";
@@ -15,25 +16,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ photoUrl: null });
   }
 
-  const result = await google.searchPlaces({
-    query: `${city} skyline landmarks`,
-    type: "attraction",
-    city,
-    country,
-    latitude: lat,
-    longitude: lng,
-    radiusMeters: 20000,
-    limit: 6,
-  });
+  const label = [city, country].filter(Boolean).join(", ");
+  const results = await Promise.all(
+    cityHeroQueries(label).map((query) =>
+      google.searchPlaces({
+        query,
+        city,
+        country,
+        latitude: lat,
+        longitude: lng,
+        radiusMeters: 20000,
+        limit: 8,
+      })
+    )
+  );
 
-  const preferred = ["landmark", "attraction", "park", "museum", "church"];
-  const place = [...result.places]
-    .filter((item) => item.photoUrls?.[0])
-    .sort((a, b) => {
-      const aBoost = preferred.includes(a.type) ? 10 : 0;
-      const bBoost = preferred.includes(b.type) ? 10 : 0;
-      return bBoost + (b.rating ?? 0) - (aBoost + (a.rating ?? 0));
-    })[0];
-
-  return NextResponse.json({ photoUrl: place?.photoUrls?.[0] ?? null });
+  const places = results.flatMap((result) => result.places);
+  return NextResponse.json({ photoUrl: pickCityHeroPhoto(places) ?? null });
 }

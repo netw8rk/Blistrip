@@ -1,3 +1,13 @@
+export interface DestinationSuggestion {
+  id: string;
+  label: string;
+  city: string;
+  country: string;
+  state?: string;
+  latitude: number;
+  longitude: number;
+}
+
 export type PlaceType =
   | "restaurant" | "bar" | "cafe" | "nightclub"
   | "hotel" | "hostel" | "apartment"
@@ -14,9 +24,11 @@ export interface NormalizedPlace {
   name: string;
   type: PlaceType;
   category?: string;
+  subcategories?: string[];
   address?: string;
   city: string;
   country: string;
+  neighborhood?: string;
   latitude?: number;
   longitude?: number;
   rating?: number;
@@ -28,6 +40,10 @@ export interface NormalizedPlace {
   mapsUrl?: string;
   photoUrls?: string[];
   description?: string;
+  businessStatus?: "OPERATIONAL" | "CLOSED_TEMPORARILY" | "CLOSED_PERMANENTLY";
+  googleTypes?: string[];
+  tags?: string[];
+  attributes?: string[];
   osmTags?: Record<string, string>;
   source: "verified" | "curated" | "ai_suggested";
   fetchedAt: string;
@@ -44,6 +60,7 @@ export interface PlaceSearchParams {
   minRating?: number;
   maxPriceLevel?: number;
   limit?: number;
+  pageToken?: string;
 }
 
 export interface PlaceSearchResult {
@@ -51,6 +68,7 @@ export interface PlaceSearchResult {
   totalFound: number;
   provider: string;
   cached: boolean;
+  nextPageToken?: string;
 }
 
 export interface HotelSearchParams {

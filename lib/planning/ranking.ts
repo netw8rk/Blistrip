@@ -83,7 +83,7 @@ export function scoreAttraction(
   }
 
   // Dislike penalty already handled; category-specific boosts
-  if (context.dislikes.includes("museums") && attraction.category === "museum") {
+  if (context.dislikes?.includes("museums") && attraction.category === "museum") {
     score = -100;
   }
 

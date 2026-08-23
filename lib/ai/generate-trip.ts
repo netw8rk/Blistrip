@@ -10,11 +10,14 @@ import {
   formatRetrievalLog,
   retrievePersonalizedPlaces,
 } from "@/lib/travel/retrieve-places";
+import { formatDiversityLog } from "@/lib/planning/diversity";
 import { runTravelAgent } from "./agent";
 import {
   applyConfirmedDestination,
   getConfirmedDestination,
 } from "@/lib/planning/confirmed-destination";
+import { track, trackAgentEvent, trackTripGeneration } from "@/lib/analytics";
+import type { PlaceRetrievalResult } from "@/lib/travel/retrieve-places";
 
 export async function generateTripPlan(input: TripPlannerInput): Promise<TripPlan> {
   const pipeline = await runPlanningPipeline(input);
@@ -45,13 +48,28 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
   console.log(formatSearchRequirementsLog(requirements));
   console.log(`OUTPUT DESTINATION → ${prefs.destination}`);
 
+  track("candidate_discovery_started", { destination: prefs.destination });
   const retrieval = city ? await retrievePersonalizedPlaces(prefs) : null;
+  if (retrieval) {
+    track("candidate_discovery_completed", {
+      destination: prefs.destination,
+      retrieved: retrieval.retrievedCount,
+      filtered: retrieval.filteredCount,
+      selected: retrieval.selected.length,
+    });
+  } else {
+    track("candidate_discovery_failed", { destination: prefs.destination });
+  }
 
   if (retrieval) {
     console.log(formatRetrievalLog(retrieval));
-    console.log(`OSM CITY → ${retrieval.city}, ${retrieval.country}`);
+    if (process.env.BLISTRIP_DEBUG_PIPELINE === "1" && retrieval.debug) {
+      console.log("PIPELINE DEBUG\n", JSON.stringify(retrieval.debug, null, 2));
+    }
+    console.log(`CITY → ${retrieval.city}, ${retrieval.country}`);
 
     const draft = buildDraftFromRankedPlaces(retrieval, prefs);
+    if (retrieval.diversity) console.log(formatDiversityLog(retrieval.diversity));
     const budget = budgetEstimate ?? estimateTripBudget(context, draft);
     let plan = buildPlanFromRetrieval(retrieval, draft, budget, prefs);
     if (confirmed) plan = applyConfirmedDestination(plan, confirmed);
@@ -59,6 +77,7 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (apiKey) {
+      trackAgentEvent("started", { destination: prefs.destination });
       try {
         const agentResult = await runTravelAgent(
           input,
@@ -67,6 +86,7 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
           prefs
         );
         if (agentResult.plan) {
+          trackAgentEvent("completed", { destination: prefs.destination });
           plan = {
             ...plan,
             tripSummary: agentResult.plan.tripSummary || plan.tripSummary,
@@ -81,13 +101,15 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
             dailyItinerary: overlayStopCopy(osmPlanDays, agentResult.plan.dailyItinerary),
           };
         } else {
+          trackAgentEvent("failed", { destination: prefs.destination });
           console.warn(`[Agent] ${agentResult.error}. Using retrieved itinerary for ${prefs.destination}.`);
         }
       } catch (error) {
-        console.warn(`[Agent] exception. Using OSM itinerary for ${prefs.destination}.`, error);
+        trackAgentEvent("failed", { destination: prefs.destination });
+        console.warn(`[Agent] exception. Using retrieved itinerary for ${prefs.destination}.`, error);
       }
     } else {
-      console.log("OpenAI key missing — returning OSM itinerary without LLM copy.");
+      console.log("OpenAI key missing — returning retrieved itinerary without LLM copy.");
     }
 
     const critic = runCriticRepairLoop(plan, retrieval, prefs, context, osmPlanDays);
@@ -105,11 +127,16 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
     console.log(`RESTAURANTS → ${plan.restaurants.map((r) => r.name).join(", ") || "(none)"}`);
     console.log(`STOPS → ${plan.activities.map((a) => a.name).join(", ") || "(none)"}`);
     console.log("================================================\n");
-    const finished = enrichTripPlan(plan, input);
+    const finished = attachPipelineDebug(enrichTripPlan(plan, input), retrieval);
+    trackTripGeneration(true, {
+      destination: finished.destination,
+      durationMs: Date.now() - startedAt,
+      livePlaces: true,
+    });
     return confirmed ? applyConfirmedDestination(finished, confirmed) : finished;
   }
 
-  console.log("OSM SEARCHES → no live places retrieved");
+  console.log("PLACE SEARCHES → no live places retrieved");
   if (pipeline.draftItinerary && (budgetEstimate || true)) {
     const budget = budgetEstimate ?? estimateTripBudget(context, pipeline.draftItinerary);
     const { buildPlanFromEngine } = await import("@/lib/planning");
@@ -121,7 +148,12 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
     }
     console.log(`FINAL OUTPUT → knowledge-base draft for ${enginePlan.destination}`);
     console.log("================================================\n");
-    const finished = enrichTripPlan(enginePlan, input);
+    const finished = attachPipelineDebug(enrichTripPlan(enginePlan, input), retrieval);
+    trackTripGeneration(true, {
+      destination: finished.destination,
+      durationMs: Date.now() - startedAt,
+      livePlaces: false,
+    });
     return confirmed ? applyConfirmedDestination(finished, confirmed) : finished;
   }
 
@@ -134,7 +166,19 @@ export async function generateTripPlan(input: TripPlannerInput): Promise<TripPla
     destinationLabel: confirmed?.label || input.destinationLabel,
     destinationUnknown: false,
   });
-  return confirmed ? applyConfirmedDestination(fallback, confirmed) : fallback;
+  const fallbackPlan = confirmed ? applyConfirmedDestination(fallback, confirmed) : fallback;
+  trackTripGeneration(true, {
+    destination: fallbackPlan.destination,
+    durationMs: Date.now() - startedAt,
+    livePlaces: false,
+    fallback: true,
+  });
+  return fallbackPlan;
+}
+
+function attachPipelineDebug(plan: TripPlan, retrieval: PlaceRetrievalResult | null): TripPlan {
+  if (process.env.BLISTRIP_DEBUG_PIPELINE !== "1" || !retrieval?.debug) return plan;
+  return { ...plan, pipelineDebug: retrieval.debug };
 }
 
 function overlayStopCopy(

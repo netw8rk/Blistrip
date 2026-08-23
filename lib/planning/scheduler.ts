@@ -9,9 +9,9 @@ import type {
 import { estimateWalkMinutes, haversineKm, orderByProximity, parseDurationMinutes } from "./geo";
 
 const PACE_SLOTS: Record<string, { morning: number; afternoon: number; evening: number }> = {
-  slow: { morning: 1, afternoon: 1, evening: 1 },
-  balanced: { morning: 2, afternoon: 2, evening: 1 },
-  packed: { morning: 2, afternoon: 2, evening: 2 },
+  slow: { morning: 2, afternoon: 2, evening: 2 },
+  balanced: { morning: 3, afternoon: 3, evening: 3 },
+  packed: { morning: 3, afternoon: 4, evening: 3 },
 };
 
 const EVENING_CATEGORIES = new Set(["nightlife", "food"]);

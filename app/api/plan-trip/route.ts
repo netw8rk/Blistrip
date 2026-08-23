@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { TripPlannerInput } from "@/types/trip";
 import { generateTripPlan } from "@/lib/ai/generate-trip";
+import { trackTripGeneration } from "@/lib/analytics";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +34,9 @@ export async function POST(request: NextRequest) {
         "Cache-Control": "no-store, no-cache, must-revalidate",
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("[plan-trip] Failed to generate trip plan", error);
+    trackTripGeneration(false, { error: "Failed to generate trip plan" });
     return NextResponse.json({ error: "Failed to generate trip plan" }, { status: 500 });
   }
 }

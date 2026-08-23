@@ -53,7 +53,6 @@ export function buildTripProfile(
   }
 ): TripProfile {
   const prefs = buildUserPreferences(input, resolved);
-  const notes = [input.additionalNotes, input.destinationDescription].filter(Boolean).join(" ");
 
   return {
     destination: prefs.destination,
@@ -78,7 +77,7 @@ export function buildTripProfile(
     preferredStartHour: prefs.pace === "slow" ? 10 : prefs.pace === "packed" ? 8 : 9,
     preferredEndHour: prefs.pace === "slow" ? 20 : 22,
     dislikes: prefs.dislikes,
-    dietary: parseDietary(notes),
+    dietary: prefs.dietary,
     notes: prefs.notes,
     prefs,
   };
@@ -102,17 +101,8 @@ export function formatTripProfileLog(profile: TripProfile): string {
     `  nightlife: ${profile.scores.nightlife}/10 food: ${profile.scores.food}/10 history: ${profile.scores.history}/10`,
     profile.dislikes.length ? `  avoid: ${profile.dislikes.join(", ")}` : "",
     profile.dietary.length ? `  dietary: ${profile.dietary.join(", ")}` : "",
+    profile.prefs.cuisineHints.length ? `  cuisine: ${profile.prefs.cuisineHints.join(", ")}` : "",
   ]
     .filter(Boolean)
     .join("\n");
-}
-
-function parseDietary(notes: string): string[] {
-  const found: string[] = [];
-  if (/\bvegan\b/i.test(notes)) found.push("vegan");
-  if (/\bvegetarian\b/i.test(notes)) found.push("vegetarian");
-  if (/\bgluten[-\s]?free\b/i.test(notes)) found.push("gluten-free");
-  if (/\bhalal\b/i.test(notes)) found.push("halal");
-  if (/\bkosher\b/i.test(notes)) found.push("kosher");
-  return found;
 }

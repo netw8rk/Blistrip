@@ -20,7 +20,7 @@ export function estimateTripBudget(
   draft: StructuredItineraryDraft | null,
   _travelers = 1
 ): BudgetEstimate {
-  const level = context.budget ?? "moderate";
+  const level = context.budget && DAILY_COST[context.budget] ? context.budget : "moderate";
   const days = draft?.duration ?? context.tripLength ?? 5;
   const daily = DAILY_COST[level];
   const travelerCount = parseTravelerCount(context.travelers);

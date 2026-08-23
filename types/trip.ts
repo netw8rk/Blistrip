@@ -161,6 +161,26 @@ export interface TripPlan {
   travelEssentials: TravelProduct[];
   createdAt: string;
   plannerInput?: TripPlannerInput;
+  /** Present only when BLISTRIP_DEBUG_PIPELINE=1. Not shown in the traveler UI. */
+  pipelineDebug?: {
+    queries: string[];
+    queryResultCounts: Record<string, number>;
+    retrievedCount: number;
+    uniqueAfterDedupe: number;
+    removedInvalid: number;
+    removedOutOfRadius: number;
+    rankedCount: number;
+    selectedCount: number;
+    topScores: Array<{
+      name: string;
+      type: string;
+      score: number;
+      reasons: string[];
+      neighborhood?: string;
+      rating?: number;
+      reviewCount?: number;
+    }>;
+  };
 }
 
 export interface Destination {

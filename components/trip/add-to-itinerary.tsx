@@ -29,12 +29,32 @@ export function placeAlreadyOnTrip(trip: TripPlan, name: string, placeId?: strin
   );
 }
 
+const CATEGORY_TO_TYPE: Record<string, string> = {
+  restaurants: "restaurant",
+  restaurant: "restaurant",
+  bars: "bar",
+  bar: "bar",
+  cafes: "cafe",
+  cafe: "cafe",
+  nightlife: "nightclub",
+  parks: "park",
+  park: "park",
+  museums: "museum",
+  museum: "museum",
+  attractions: "attraction",
+  attraction: "attraction",
+  shopping: "shop",
+  markets: "market",
+  market: "market",
+};
+
 export function activityToStop(activity: ActivityRecommendation): ItineraryActivity {
+  const category = activity.category?.toLowerCase() ?? "";
   return {
     name: activity.name,
     description: activity.address || activity.description,
     whyRecommended: activity.whyRecommended,
-    type: activity.category?.toLowerCase(),
+    type: CATEGORY_TO_TYPE[category] ?? category,
     latitude: activity.latitude,
     longitude: activity.longitude,
     address: activity.address,
@@ -102,8 +122,8 @@ export function AddToItineraryButton({ trip, alreadyAdded, onAdd }: AddToItinera
 
   if (alreadyAdded) {
     return (
-      <span className="inline-flex items-center gap-1 text-sm text-foreground-secondary">
-        <Check className="h-3.5 w-3.5" />
+      <span className="inline-flex items-center gap-1 text-xs text-foreground-secondary">
+        <Check className="h-3 w-3" />
         On itinerary
       </span>
     );

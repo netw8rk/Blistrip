@@ -15,7 +15,7 @@ export type {
 } from "./types";
 
 export { buildEnhancedPlanningContext, inferPlanningMode } from "./context";
-export { buildUserPreferences, formatPreferencesLog, activitiesPerDay } from "./preferences";
+export { buildUserPreferences, formatPreferencesLog, activitiesPerDay, slotTargets } from "./preferences";
 export { buildTripProfile, formatTripProfileLog } from "./trip-profile";
 export { buildSearchRequirements, formatSearchRequirementsLog } from "./search-requirements";
 export { SCORING_WEIGHTS } from "./scoring-weights";

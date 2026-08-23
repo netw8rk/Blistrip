@@ -185,8 +185,8 @@ async function runTests() {
       {
         day: 1,
         title: "Day 1",
-        morning: Array.from({ length: 4 }, (_, i) => ({ name: `M${i}`, description: "", whyRecommended: "" })),
-        afternoon: Array.from({ length: 3 }, (_, i) => ({ name: `A${i}`, description: "", whyRecommended: "" })),
+        morning: Array.from({ length: 7 }, (_, i) => ({ name: `M${i}`, description: "", whyRecommended: "" })),
+        afternoon: Array.from({ length: 7 }, (_, i) => ({ name: `A${i}`, description: "", whyRecommended: "" })),
         evening: [],
       },
     ],
@@ -248,6 +248,13 @@ async function runTests() {
   assert(mapOsm({ amenity: "restaurant" }) === "restaurant", "OSM restaurant type maps correctly");
   assert(mapOsm({ tourism: "hotel" }) === "hotel", "OSM hotel type maps correctly");
   assert(mapOsm({ amenity: "bar" }) === "bar", "OSM bar type maps correctly");
+
+  const { mapGoogleType, isExcludedGoogleTypes } = await import("../lib/travel/providers/google-places");
+  assert(mapGoogleType(["italian_restaurant", "food"]) === "restaurant", "Google restaurant subtypes map to restaurant");
+  assert(mapGoogleType(["wine_bar", "bar"]) === "bar", "Google bar subtypes map to bar");
+  assert(mapGoogleType(["national_park"]) === "park", "Google park subtypes map to park");
+  assert(isExcludedGoogleTypes(["grocery_store", "food", "point_of_interest"]), "grocery stores are excluded");
+  assert(!isExcludedGoogleTypes(["restaurant", "food"]), "restaurants are not excluded");
 
   const overlaid = applyVerifiedPlacesToPlan(validPlan, {
     city: "Tokyo",
@@ -326,6 +333,7 @@ async function runTests() {
   assert(queriesB.includes("historic") || queriesB.includes("museums"), "history profile searches historic/museums");
   assert(queriesC.includes("parks") || queriesC.includes("adventure"), "nature profile searches parks/adventure");
   assert(queriesA.join(",") !== queriesB.join(","), "profile A and B produce different OSM query sets");
+  assert(!queriesA.includes("attractions"), "food/nightlife profile skips generic attraction search");
 
   const fakePool: import("../lib/travel/types").NormalizedPlace[] = [
     { ...normalizedPlace, name: "Cross Club", type: "nightclub", providerPlaceId: "n/1", osmTags: { amenity: "nightclub" } },
@@ -340,6 +348,19 @@ async function runTests() {
   assert(rankedA[0].place.type === "nightclub" || rankedA[0].place.type === "bar" || rankedA[0].place.type === "restaurant", "nightlife/food profile ranks venues first");
   assert(rankedB[0].place.type === "landmark" || rankedB[0].place.type === "museum", "history profile ranks castle/museum first");
   assert(rankedA[0].place.name !== rankedB[0].place.name, "different profiles rank different top places");
+
+  const { parseDislikes } = await import("../lib/planning/preferences");
+  const { reviewConfidenceScore } = await import("../lib/planning/scoring-weights");
+  assert(prefB.dislikes.includes("nightlife"), "history notes capture nightlife dislike");
+  assert(parseDislikes("no tourist traps").includes("crowds"), "tourist-trap notes become crowds dislike");
+  assert(
+    reviewConfidenceScore(4.7, 5000) > reviewConfidenceScore(5, 3),
+    "review confidence prefers established ratings"
+  );
+  const lowReview = { ...normalizedPlace, id: "low", name: "New Cafe", type: "cafe" as const, rating: 5, reviewCount: 3, providerPlaceId: "low" };
+  const established = { ...normalizedPlace, id: "est", name: "Old Cafe", type: "cafe" as const, rating: 4.6, reviewCount: 2100, providerPlaceId: "est" };
+  const cafeRanked = rankPlaces([lowReview, established], prefA);
+  assert(cafeRanked[0].place.id === "est", "established cafe outranks a 5.0 with 3 reviews");
 
   const hallucinated = {
     ...validPlan,
@@ -381,6 +402,29 @@ async function runTests() {
   assert(!charlotteMock.hotelRecommendations.some((h) => h.name === "Hotel Josef"), "Charlotte fallback does not use Prague hotels");
   assert(!charlotteMock.neighborhoods.some((n) => n.name === "Žižkov"), "Charlotte fallback does not use Prague neighborhoods");
 
+  console.log("\nGoogle destination names:");
+  const { destinationFromGooglePlace } = await import("../lib/travel/providers/google-places");
+  const pragueGoogle = destinationFromGooglePlace({
+    id: "ChIJi3lwCZyTC0cRkEAWZg-vAA8",
+    displayName: { text: "Prague" },
+    location: { latitude: 50.0755, longitude: 14.4378 },
+    types: ["locality", "political"],
+    addressComponents: [
+      { longText: "Prague", types: ["locality", "political"] },
+      { longText: "Czechia", types: ["country", "political"] },
+    ],
+  });
+  assert(pragueGoogle?.city === "Prague", "Google destination uses Prague, not Praha");
+  assert(pragueGoogle?.label.startsWith("Prague"), "Google destination label is English");
+  assert(
+    destinationFromGooglePlace({
+      displayName: { text: "Lokál" },
+      location: { latitude: 50.08, longitude: 14.42 },
+      types: ["restaurant", "food", "point_of_interest"],
+    }) === null,
+    "Google destination search rejects restaurants"
+  );
+
   console.log("\nDestination suggestions:");
   const { mapNominatimToSuggestions } = await import("../lib/travel/suggest-places");
   const mapped = mapNominatimToSuggestions(
@@ -419,6 +463,43 @@ async function runTests() {
   assert(mapped[0].label.includes("North Carolina"), "labels include state for disambiguation");
   assert(mapped[1].country === "United States", "keeps country from Nominatim");
 
+  const prague = mapNominatimToSuggestions(
+    [
+      {
+        osm_id: 10,
+        osm_type: "relation",
+        name: "Praha",
+        lat: "50.0755",
+        lon: "14.4378",
+        addresstype: "city",
+        namedetails: { name: "Praha", "name:en": "Prague" },
+        address: { city: "Praha", state: "Hlavní město Praha", country: "Česko" },
+      },
+    ],
+    "Prague"
+  );
+  assert(prague[0]?.city === "Prague", "uses the common English city name instead of Praha");
+  assert(prague[0]?.label.startsWith("Prague"), "suggestion label starts with Prague");
+  assert(prague[0]?.country === "Czech Republic", "uses the common English country name");
+  assert(!prague[0]?.label.includes("Hlavní"), "drops the local-language region when the city is already named");
+
+  const vienna = mapNominatimToSuggestions(
+    [
+      {
+        osm_id: 11,
+        osm_type: "relation",
+        name: "Wien",
+        lat: "48.2082",
+        lon: "16.3738",
+        addresstype: "city",
+        address: { city: "Wien", country: "Österreich" },
+      },
+    ],
+    "Vienna"
+  );
+  assert(vienna[0]?.city === "Vienna", "aliases Wien to Vienna when English name is missing");
+  assert(vienna[0]?.country === "Austria", "aliases Österreich to Austria");
+
   console.log("\nExact destination radius:");
   const { isWithinRadiusKm, DESTINATION_MATCH_KM } = await import("../lib/planning/geo");
   const charlotteNc = { lat: 35.2271, lon: -80.8431 };
@@ -439,13 +520,40 @@ async function runTests() {
     "rejects a Charlotte Florida hotel for a Charlotte NC search"
   );
 
+  console.log("\nCity header photos:");
+  const { isCityscapePlace, pickCityHeroPhoto } = await import("../lib/travel/city-hero-photo");
+  assert(isCityscapePlace({ name: "Prague Skyline Viewpoint", type: "attraction" }), "skyline viewpoint is a city photo");
+  assert(isCityscapePlace({ name: "Old Town Square", type: "landmark" }), "old town square is a city photo");
+  assert(isCityscapePlace({ name: "Charles Bridge", type: "landmark" }), "bridge landmarks are city photos");
+  assert(!isCityscapePlace({ name: "Lokál Pub", type: "bar" }), "bars are not header photos");
+  assert(!isCityscapePlace({ name: "Café Savoy", type: "cafe" }), "cafes are not header photos");
+  assert(!isCityscapePlace({ name: "National Museum", type: "museum" }), "museums are not header photos");
+  assert(!isCityscapePlace({ name: "Skyline Restaurant", type: "restaurant" }), "a restaurant named skyline is still rejected");
+  assert(!isCityscapePlace({ name: "Letná Park", type: "park" }), "a generic park is not treated as a cityscape");
+  assert(isCityscapePlace({ name: "Letná Park Viewpoint", type: "park" }), "a park viewpoint can be a city photo");
+  const headerPick = pickCityHeroPhoto([
+    { ...normalizedPlace, name: "Café Louvre", type: "cafe", photoUrls: ["/api/places/photo?name=places%2Fcafe%2Fphotos%2Fa"] },
+    { ...normalizedPlace, name: "Prague Castle", type: "landmark", photoUrls: ["/api/places/photo?name=places%2Fcastle%2Fphotos%2Fa"] },
+  ]);
+  assert(headerPick?.includes("castle"), "header prefers a city landmark over a cafe");
+
   console.log("\nGoogle place links:");
-  const { googlePhotoProxyUrl, googlePlacePageUrl } = await import("../lib/travel/google-links");
+  const { googlePhotoProxyUrl, googleHeroPhotoSrc, withGooglePhotoWidth, googlePlacePageUrl } = await import("../lib/travel/google-links");
   assert(
     googlePhotoProxyUrl("places/ChIJ123/photos/Abc") === "/api/places/photo?name=places%2FChIJ123%2Fphotos%2FAbc",
     "builds a local photo proxy URL"
   );
   assert(googlePhotoProxyUrl("https://example.com/x") === undefined, "rejects non-Google photo names");
+  assert(
+    googleHeroPhotoSrc("/api/places/photo?name=places%2FChIJ123%2Fphotos%2FAbc") ===
+      "/api/places/photo?name=places%2FChIJ123%2Fphotos%2FAbc&w=2400",
+    "requests a high-res header photo"
+  );
+  assert(
+    withGooglePhotoWidth("/api/places/photo?name=places%2FChIJ123%2Fphotos%2FAbc", 1600) ===
+      "/api/places/photo?name=places%2FChIJ123%2Fphotos%2FAbc&w=1600",
+    "requests a high-res place-card photo"
+  );
   assert(
     googlePlacePageUrl({
       name: "Mint Museum",

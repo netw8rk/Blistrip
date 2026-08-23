@@ -71,7 +71,7 @@ export class OpenStreetMapProvider implements TravelDataProvider {
   name = "openstreetmap";
 
   isConfigured(): boolean {
-    return true;
+    return !process.env.GOOGLE_PLACES_API_KEY;
   }
 
   async searchPlaces(params: PlaceSearchParams): Promise<PlaceSearchResult> {
@@ -502,6 +502,9 @@ out body 40;
     const tags = el.tags ?? {};
     const name = tags.name?.trim();
     if (!name) return null;
+    if (["supermarket", "convenience", "greengrocer", "grocery", "general"].includes(tags.shop ?? "")) {
+      return null;
+    }
 
     const lat = el.lat ?? el.center?.lat;
     const lon = el.lon ?? el.center?.lon;

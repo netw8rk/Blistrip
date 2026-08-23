@@ -1,6 +1,7 @@
 import type { TripPlannerInput } from "@/types/trip";
 import { parseBudgetRange } from "@/lib/utils";
 import { parseRegionFromLabel } from "./confirmed-destination";
+import { slotBudgets } from "./slot-fit";
 
 export type PreferenceScore = number;
 
@@ -39,6 +40,8 @@ export interface UserTripPreferences {
   scores: PreferenceScores;
   selectedInterests: string[];
   dislikes: string[];
+  dietary: string[];
+  cuisineHints: string[];
   notes?: string;
 }
 
@@ -92,15 +95,11 @@ export function buildUserPreferences(
   const budgetAmount = parseBudgetRange(input.budget, input.customBudget);
   const budgetLevel = budgetAmount < 800 ? "low" : budgetAmount < 2500 ? "moderate" : "high";
 
-  const dislikes = [...(resolved?.dislikes ?? [])];
-  if (/\bhate\s+museums?|\bno\s+museums?/i.test(notes)) {
-    dislikes.push("museums");
-    scores.culture = Math.min(scores.culture, 2);
-  }
-  if (/\bno\s+nightlife|\bhate\s+nightlife|\bnot\s+into\s+nightlife/i.test(notes)) {
-    dislikes.push("nightlife");
-    scores.nightlife = 1;
-  }
+  const dietary = parseDietary(notes);
+  const cuisineHints = parseCuisineHints(notes, dietary);
+  const dislikes = parseDislikes(notes, [...(resolved?.dislikes ?? [])]);
+  if (dislikes.includes("museums")) scores.culture = Math.min(scores.culture, 2);
+  if (dislikes.includes("nightlife")) scores.nightlife = 1;
 
   let tripLength = resolved?.tripLength;
   if (!tripLength && input.startDate && input.endDate) {
@@ -133,14 +132,87 @@ export function buildUserPreferences(
     scores,
     selectedInterests: input.interests,
     dislikes: [...new Set(dislikes)],
+    dietary,
+    cuisineHints,
     notes: input.additionalNotes,
   };
 }
 
+export function diningSearchPhrase(prefs: Pick<UserTripPreferences, "dietary" | "cuisineHints">): string {
+  return [prefs.dietary[0], prefs.cuisineHints[0], "restaurants"].filter(Boolean).join(" ");
+}
+
+const CUISINE_HINTS = [
+  "italian",
+  "thai",
+  "mexican",
+  "japanese",
+  "sushi",
+  "seafood",
+  "chinese",
+  "indian",
+  "korean",
+  "french",
+  "spanish",
+  "vietnamese",
+  "mediterranean",
+  "ramen",
+  "bbq",
+  "pizza",
+  "brunch",
+  "tapas",
+];
+
+export function parseDislikes(notes: string, existing: string[] = []): string[] {
+  const found = [...existing];
+  if (/\bhate\s+museums?|\bno\s+museums?|\bdon'?t\s+(like|want)\s+museums?/i.test(notes)) found.push("museums");
+  if (/\bno\s+nightlife|\bhate\s+nightlife|\bnot\s+into\s+nightlife|\bno\s+clubs?/i.test(notes)) found.push("nightlife");
+  if (/\bhate\s+crowds?|\bavoid\s+tourists?|\bno\s+tourist\s+traps?/i.test(notes)) found.push("crowds");
+  if (/\bno\s+shopping|\bhate\s+shopping/i.test(notes)) found.push("shopping");
+  if (/\bno\s+long\s+walks?|\blimited\s+mobility|\bwheelchair/i.test(notes)) found.push("long walks");
+  if (/\btoo\s+expensive|\bno\s+luxury|\bavoid\s+expensive/i.test(notes)) found.push("expensive");
+  if (/\bearly\s+mornings?|\bdon'?t\s+want\s+to\s+wake\s+up\s+early/i.test(notes)) found.push("early mornings");
+  return [...new Set(found)];
+}
+
+export function parseDietary(notes: string): string[] {
+  if (!notes) return [];
+  const found: string[] = [];
+  if (/\bvegan\b/i.test(notes)) found.push("vegan");
+  if (/\bvegetarian\b/i.test(notes)) found.push("vegetarian");
+  if (/\bgluten[-\s]?free\b/i.test(notes)) found.push("gluten-free");
+  if (/\bhalal\b/i.test(notes)) found.push("halal");
+  if (/\bkosher\b/i.test(notes)) found.push("kosher");
+  return found;
+}
+
+export function parseCuisineHints(notes: string, dietary: string[] = []): string[] {
+  if (!notes) return [];
+  const meatHeavy = new Set(["bbq", "seafood"]);
+  return CUISINE_HINTS.filter((hint) => {
+    if ((dietary.includes("vegan") || dietary.includes("vegetarian")) && meatHeavy.has(hint)) {
+      return false;
+    }
+    return new RegExp(`\\b${hint}\\b`, "i").test(notes);
+  });
+}
+
+export function slotTargets(prefs: UserTripPreferences): {
+  morning: number;
+  afternoon: number;
+  evening: number;
+} {
+  const budgets = slotBudgets(prefs);
+  return {
+    morning: budgets.morning.max,
+    afternoon: budgets.afternoon.max,
+    evening: budgets.evening.max,
+  };
+}
+
 export function activitiesPerDay(prefs: UserTripPreferences): number {
-  if (prefs.pace === "slow") return 3;
-  if (prefs.pace === "packed") return 6;
-  return 4;
+  const slots = slotTargets(prefs);
+  return slots.morning + slots.afternoon + slots.evening;
 }
 
 export function maxWalkKm(prefs: UserTripPreferences): number {
@@ -174,6 +246,8 @@ export function formatPreferencesLog(prefs: UserTripPreferences): string {
     `  local experiences: ${prefs.scores.localExperiences}/10`,
   ];
   if (prefs.dislikes.length) lines.push(`  avoid: ${prefs.dislikes.join(", ")}`);
+  if (prefs.dietary.length) lines.push(`  dietary: ${prefs.dietary.join(", ")}`);
+  if (prefs.cuisineHints.length) lines.push(`  cuisine: ${prefs.cuisineHints.join(", ")}`);
   return lines.filter(Boolean).join("\n");
 }
 

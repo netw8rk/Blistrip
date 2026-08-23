@@ -1,10 +1,28 @@
 export const GOOGLE_PHOTO_NAME_PATTERN = /^places\/[^/]+\/photos\/[^/]+$/;
 
-export function googlePhotoProxyUrl(photoName?: string): string | undefined {
+export function googlePhotoProxyUrl(photoName?: string, widthPx = 800): string | undefined {
   if (!photoName) return undefined;
   const name = photoName.startsWith("places/") ? photoName : `places/${photoName}`;
   if (!GOOGLE_PHOTO_NAME_PATTERN.test(name)) return undefined;
-  return `/api/places/photo?name=${encodeURIComponent(name)}`;
+  const width = clampPhotoWidth(widthPx);
+  const url = `/api/places/photo?name=${encodeURIComponent(name)}`;
+  return width === 800 ? url : `${url}&w=${width}`;
+}
+
+export function withGooglePhotoWidth(src?: string, widthPx = 800): string | undefined {
+  if (!src?.startsWith("/api/places/photo")) return src;
+  const width = clampPhotoWidth(widthPx);
+  const withoutWidth = src.replace(/([?&])w=\d+/, "").replace(/[?&]$/, "");
+  return `${withoutWidth}${withoutWidth.includes("?") ? "&" : "?"}w=${width}`;
+}
+
+export function googleHeroPhotoSrc(src?: string, widthPx = 2400): string | undefined {
+  return withGooglePhotoWidth(src, widthPx);
+}
+
+function clampPhotoWidth(widthPx: number): number {
+  if (!Number.isFinite(widthPx)) return 800;
+  return Math.min(4800, Math.max(200, Math.round(widthPx)));
 }
 
 export function googlePhotoUrls(photos?: { name?: string }[]): string[] | undefined {

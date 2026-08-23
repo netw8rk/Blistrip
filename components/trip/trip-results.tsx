@@ -28,9 +28,10 @@ import {
   deleteSavedTrip,
   setActiveTrip,
 } from "@/lib/storage";
-import type { ActivityRecommendation, ItineraryActivity, TripPlan } from "@/types/trip";
+import type { ActivityRecommendation, ItineraryActivity, RestaurantRecommendation, TripPlan } from "@/types/trip";
 import { getHeroDestinationImage, getPlaceFallbackImage } from "@/lib/images";
-import { googlePlacePageUrl, isGooglePhotoSrc } from "@/lib/travel/google-links";
+import { writeDayGuideNote } from "@/lib/travel/day-guide";
+import { googleHeroPhotoSrc, googlePlacePageUrl, isGooglePhotoSrc, withGooglePhotoWidth } from "@/lib/travel/google-links";
 import { TripRefinePanel } from "@/components/trip/trip-refine-panel";
 import {
   AddToItineraryButton,
@@ -38,7 +39,6 @@ import {
   addStopToTrip,
   placeAlreadyOnTrip,
   removeStopFromTrip,
-  restaurantToStop,
   type DaySlot,
 } from "@/components/trip/add-to-itinerary";
 
@@ -70,11 +70,10 @@ export function TripResults({ tripId }: TripResultsProps) {
 
   useEffect(() => {
     if (!trip) return;
-    if (trip.destinationPhotoUrl) {
-      setHeroPhotoUrl(trip.destinationPhotoUrl);
+    if (trip.destinationLatitude == null || trip.destinationLongitude == null) {
+      setHeroPhotoUrl(undefined);
       return;
     }
-    if (trip.destinationLatitude == null || trip.destinationLongitude == null) return;
     const params = new URLSearchParams({
       city: trip.destination,
       country: trip.country ?? "",
@@ -84,9 +83,11 @@ export function TripResults({ tripId }: TripResultsProps) {
     fetch(`/api/places/destination-photo?${params}`)
       .then((res) => res.json() as Promise<{ photoUrl?: string | null }>)
       .then((data) => {
-        if (data.photoUrl) setHeroPhotoUrl(data.photoUrl);
+        setHeroPhotoUrl(data.photoUrl || undefined);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        setHeroPhotoUrl(undefined);
+      });
   }, [trip]);
 
   const persist = (next: TripPlan) => {
@@ -109,31 +110,25 @@ export function TripResults({ tripId }: TripResultsProps) {
     }
   };
 
+  const topRatedPlaces = useMemo(() => mergeTopRatedPlaces(trip), [trip]);
+
   const activityTypes = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const activity of trip?.activities ?? []) {
-      const type = activityTypeLabel(activity);
+    for (const place of topRatedPlaces) {
+      const type = placeCategoryLabel(place);
       counts.set(type, (counts.get(type) ?? 0) + 1);
     }
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [trip?.activities]);
+  }, [topRatedPlaces]);
 
   const visibleActivities = useMemo(() => {
-    const activities = trip?.activities ?? [];
     const list =
       activityTypeFilter === "all"
-        ? [...activities]
-        : activities.filter((activity) => activityTypeLabel(activity) === activityTypeFilter);
-
-    list.sort((a, b) => {
-      if (activityTypeFilter === "all") {
-        const typeCmp = activityTypeLabel(a).localeCompare(activityTypeLabel(b));
-        if (typeCmp !== 0) return typeCmp;
-      }
-      return (b.rating ?? 0) - (a.rating ?? 0);
-    });
+        ? [...topRatedPlaces]
+        : topRatedPlaces.filter((place) => placeCategoryLabel(place) === activityTypeFilter);
+    list.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     return list;
-  }, [trip?.activities, activityTypeFilter]);
+  }, [topRatedPlaces, activityTypeFilter]);
 
   useEffect(() => {
     if (activityTypeFilter === "all") return;
@@ -196,13 +191,13 @@ export function TripResults({ tripId }: TripResultsProps) {
 
         <div className="relative h-52 sm:h-72 overflow-hidden">
           <Image
-            src={heroPhotoUrl || getHeroDestinationImage(trip.destination)}
+            src={googleHeroPhotoSrc(heroPhotoUrl, 2400) || getHeroDestinationImage(trip.destination)}
             alt={trip.destination}
             fill
             unoptimized={isGooglePhotoSrc(heroPhotoUrl)}
             className="object-cover object-center"
             sizes="100vw"
-            quality={90}
+            quality={95}
             priority
           />
           <div
@@ -274,12 +269,13 @@ export function TripResults({ tripId }: TripResultsProps) {
       <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
         <p className="eyebrow mb-2">Stay</p>
         <h2 className="text-2xl sm:text-3xl font-bold mb-8">Where to stay</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {trip.hotelRecommendations.map((hotel) => (
             <PhotoPlaceCard
               key={hotel.name}
               title={hotel.name}
-              photoSrc={hotel.photoUrl || getPlaceFallbackImage(hotel.name, trip.destination, 800)}
+              photoSrc={hotel.photoUrl || getPlaceFallbackImage(hotel.name, trip.destination, 1600)}
+              category="Hotel"
               line={[hotel.address || hotel.neighborhood, hotel.priceRange !== "Check current rates" ? hotel.priceRange : ""]
                 .filter(Boolean)
                 .join(" · ")}
@@ -292,61 +288,101 @@ export function TripResults({ tripId }: TripResultsProps) {
       </section>
 
       <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-10 border-t border-border">
-        <p className="eyebrow mb-2">Itinerary</p>
-        <h2 className="text-2xl sm:text-3xl font-bold mb-2">Day by day</h2>
-        <p className="text-base text-muted mb-8">Add or remove stops anytime from the lists below.</p>
-        <div className="space-y-8">
+        <p className="mb-3 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[13px]">
+          Itinerary
+        </p>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl leading-[1.15] mb-2">
+          Day by day
+        </h2>
+        <p className="text-base text-foreground-secondary mb-10 max-w-xl">
+          Add or remove stops anytime from the lists below.
+        </p>
+        <div className="grid gap-6">
           {trip.dailyItinerary.map((day) => (
-            <Card key={day.day} className="overflow-hidden">
-              <div className="flex items-center gap-4 px-6 py-5 border-b border-border">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-muted text-base font-semibold text-primary">
-                  {day.day}
-                </span>
-                <h3 className="text-xl font-semibold">{day.title}</h3>
+            <article
+              key={day.day}
+              className="overflow-hidden rounded-[var(--radius-card)] border border-border"
+            >
+              <div className="px-5 py-5 sm:px-6 sm:py-6">
+                <p className="mb-2 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[13px]">
+                  Day {day.day}
+                </p>
+                <h3 className="text-xl font-semibold tracking-tight text-foreground leading-[1.2]">
+                  {day.title}
+                </h3>
+                <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-foreground-secondary font-sub">
+                  {writeDayGuideNote(day, trip.destination, trip.duration)}
+                </p>
               </div>
-              <div className="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
-                {(["morning", "afternoon", "evening"] as const).map((period) => (
-                  <div key={period} className="p-4 min-h-[16rem]">
-                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted mb-3 px-1">
-                      {period}
-                    </p>
-                    <div className="space-y-4">
-                      {day[period].length === 0 && (
-                        <p className="px-1 text-base text-muted leading-7">
-                          Empty — add something from Recommended Activities.
-                        </p>
+              <div className="grid border-t border-border sm:grid-cols-3">
+                {(["morning", "afternoon", "evening"] as const).map((period, periodIndex) => {
+                  const stops = day[period];
+                  const rowCount = Math.max(1, day.morning.length, day.afternoon.length, day.evening.length);
+                  return (
+                    <div
+                      key={period}
+                      className={cn(
+                        "flex min-w-0 flex-col",
+                        periodIndex > 0 && "border-t border-border sm:border-l sm:border-t-0",
                       )}
-                      {day[period].map((activity: ItineraryActivity, index: number) => (
-                        <ItineraryStopCard
-                          key={`${activity.name}-${index}`}
-                          activity={activity}
-                          photoSrc={
-                            activity.photoUrl ||
-                            resolveStopPhoto(trip, activity) ||
-                            getPlaceFallbackImage(activity.name, trip.destination, 800)
-                          }
-                          onRemove={() => removeStop(day.day, period, index)}
-                          onWhy={() => setWhyDialog({ title: activity.name, reason: activity.whyRecommended })}
-                        />
-                      ))}
+                    >
+                      <p className="border-b border-border px-4 py-3 text-sm font-semibold capitalize tracking-tight text-foreground font-sub sm:px-5 sm:text-[15px]">
+                        {period}
+                      </p>
+                      {Array.from({ length: rowCount }, (_, row) => {
+                        const activity = stops[row];
+                        return (
+                          <div
+                            key={activity ? `${activity.name}-${row}` : `empty-${row}`}
+                            className={cn(
+                              "flex-1 px-3 py-3 sm:px-4",
+                              row < rowCount - 1 && "border-b border-border",
+                            )}
+                          >
+                            {activity ? (
+                              <ItineraryStopCard
+                                activity={activity}
+                                photoSrc={
+                                  activity.photoUrl ||
+                                  resolveStopPhoto(trip, activity) ||
+                                  getPlaceFallbackImage(activity.name, trip.destination, 1600)
+                                }
+                                onRemove={() => removeStop(day.day, period, row)}
+                                onWhy={() =>
+                                  setWhyDialog({
+                                    title: activity.name,
+                                    reason: activity.whyRecommended,
+                                  })
+                                }
+                              />
+                            ) : stops.length === 0 && row === 0 ? (
+                              <p className="subcontainer-body">
+                                Empty — add something from Top Rated Places.
+                              </p>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </Card>
+            </article>
           ))}
         </div>
       </section>
 
       <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
         <p className="eyebrow mb-2">More options</p>
-        <h2 className="text-2xl sm:text-3xl font-bold mb-2">Recommended Activities</h2>
-        <p className="text-base text-muted mb-6">Places you can add to any day.</p>
+        <h2 className="text-2xl sm:text-3xl font-bold mb-2">Top Rated Places</h2>
+        <p className="text-base text-muted mb-6">
+          Highly rated restaurants, bars, parks, and sights you can add to any day.
+        </p>
         {activityTypes.length > 1 && (
-          <div className="flex flex-wrap gap-2 mb-8" role="tablist" aria-label="Filter activities by type">
+          <div className="flex flex-wrap gap-2 mb-8" role="tablist" aria-label="Filter places by type">
             <TypeFilterChip
               label="All"
-              count={trip.activities.length}
+              count={topRatedPlaces.length}
               selected={activityTypeFilter === "all"}
               onClick={() => setActivityTypeFilter("all")}
             />
@@ -362,21 +398,23 @@ export function TripResults({ tripId }: TripResultsProps) {
           </div>
         )}
         {visibleActivities.length === 0 ? (
-          <p className="text-base text-muted">No {activityTypeFilter === "all" ? "" : `${activityTypeFilter.toLowerCase()} `}activities on this trip.</p>
+          <p className="text-base text-muted">
+            No {activityTypeFilter === "all" ? "" : `${activityTypeFilter.toLowerCase()} `}places on this trip.
+          </p>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {visibleActivities.map((activity) => (
               <RecommendationCard
                 key={`${activity.providerPlaceId ?? activity.name}`}
                 title={activity.name}
-                category={activity.category}
-                line={[activity.address || activity.description, activity.price !== "Check locally" ? activity.price : ""]
+                category={placeCategoryLabel(activity)}
+                line={[activity.address || activity.description, activity.price && activity.price !== "Check locally" ? activity.price : ""]
                   .filter(Boolean)
                   .join(" · ")}
                 rating={activity.rating}
                 reviewCount={activity.reviewCount}
                 photoUrl={activity.photoUrl}
-                fallbackImage={getPlaceFallbackImage(activity.name, trip.destination, 400)}
+                fallbackImage={getPlaceFallbackImage(activity.name, trip.destination, 1600)}
                 mapsUrl={googlePlacePageUrl(activity)}
                 alreadyAdded={placeAlreadyOnTrip(trip, activity.name, activity.providerPlaceId)}
                 onAdd={(day, slot) => addRecommendation(activityToStop(activity), day, slot)}
@@ -385,31 +423,6 @@ export function TripResults({ tripId }: TripResultsProps) {
             ))}
           </div>
         )}
-      </section>
-
-      <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
-        <p className="eyebrow mb-2">Dining</p>
-        <h2 className="text-2xl sm:text-3xl font-bold mb-2">Where to eat</h2>
-        <p className="text-base text-muted mb-8">Add a restaurant to dinner or any other slot.</p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {trip.restaurants.map((restaurant) => (
-            <RecommendationCard
-              key={`${restaurant.providerPlaceId ?? restaurant.name}`}
-              title={restaurant.name}
-              line={[restaurant.cuisine, restaurant.priceRange !== "–" ? restaurant.priceRange : "", restaurant.address || restaurant.location]
-                .filter(Boolean)
-                .join(" · ")}
-              rating={restaurant.rating}
-              reviewCount={restaurant.reviewCount}
-              photoUrl={restaurant.photoUrl}
-              fallbackImage={getPlaceFallbackImage(restaurant.name, trip.destination, 400)}
-              mapsUrl={googlePlacePageUrl(restaurant)}
-              alreadyAdded={placeAlreadyOnTrip(trip, restaurant.name, restaurant.providerPlaceId)}
-              onAdd={(day, slot) => addRecommendation(restaurantToStop(restaurant), day, slot)}
-              trip={trip}
-            />
-          ))}
-        </div>
       </section>
 
       <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
@@ -551,68 +564,71 @@ function PhotoPlaceCard({
   actions?: ReactNode;
 }) {
   return (
-    <article className="group relative overflow-hidden rounded-[var(--radius-card)] min-h-[20rem] isolate">
-      <Image
-        src={photoSrc}
-        alt={title}
-        fill
-        unoptimized={isGooglePhotoSrc(photoSrc)}
-        className="object-cover"
-        sizes="(max-width: 768px) 100vw, 33vw"
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(to top, #ffffff 0%, #ffffff 22%, rgba(255,255,255,0.92) 38%, rgba(255,255,255,0.55) 55%, rgba(255,255,255,0) 78%)",
-        }}
-      />
-      {category && (
-        <Badge variant="secondary" className="absolute top-3 left-3 z-10 bg-white/90 text-sm">
-          {category}
-        </Badge>
-      )}
-      {onRemove && (
-        <button
-          type="button"
-          onClick={onRemove}
-          className="absolute top-2.5 right-2.5 z-10 rounded-md bg-white/90 p-1.5 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-white group-hover:opacity-100"
-          aria-label={`Remove ${title}`}
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      )}
-      <div className="absolute inset-x-0 bottom-0 z-10 p-4">
-        <h3 className="text-lg font-semibold leading-6 text-[#252329]">{title}</h3>
-        {line && <p className="mt-1 text-sm leading-5 text-[#4a4750] line-clamp-2">{line}</p>}
-        {rating != null && rating > 0 && (
-          <p className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-[#252329]">
-            <Star className="h-3.5 w-3.5" />
-            {rating}
-            {reviewCount ? ` · ${reviewCount} reviews` : ""}
-          </p>
+    <article className="group relative overflow-hidden rounded-[var(--radius-card)] isolate">
+      <div className="relative aspect-[5/4]">
+        <Image
+          src={withGooglePhotoWidth(photoSrc, 900) || photoSrc}
+          alt={title}
+          fill
+          unoptimized={isGooglePhotoSrc(photoSrc)}
+          className="object-cover"
+          sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw"
+          quality={85}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to top, #ffffff 0%, #ffffff 18%, rgba(255,255,255,0.9) 36%, rgba(255,255,255,0.45) 58%, rgba(255,255,255,0) 78%)",
+          }}
+        />
+        {category && (
+          <Badge variant="secondary" className="absolute top-2 left-2 z-10 bg-white/90 text-xs">
+            {category}
+          </Badge>
         )}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          {actions}
-          {onWhy && (
-            <button
-              type="button"
-              onClick={onWhy}
-              className="text-sm font-medium text-primary hover:text-primary-hover"
-            >
-              Why this?
-            </button>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute top-2 right-2 z-10 rounded-md bg-white/90 p-1 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-white group-hover:opacity-100"
+            aria-label={`Remove ${title}`}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+        <div className="absolute inset-x-0 bottom-0 z-10 p-3">
+          <h3 className="text-[15px] font-semibold leading-5 text-[#252329] line-clamp-2">{title}</h3>
+          {line && <p className="mt-0.5 text-xs leading-4 text-[#4a4750] line-clamp-1">{line}</p>}
+          {rating != null && rating > 0 && (
+            <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#252329]">
+              <Star className="h-3 w-3" />
+              {rating}
+              {reviewCount ? ` · ${reviewCount}` : ""}
+            </p>
           )}
-          {mapsUrl && (
-            <a
-              href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-[#252329] hover:text-primary"
-            >
-              Open in Google
-            </a>
-          )}
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {actions}
+            {onWhy && (
+              <button
+                type="button"
+                onClick={onWhy}
+                className="text-xs font-medium text-primary hover:text-primary-hover"
+              >
+                Why this?
+              </button>
+            )}
+            {mapsUrl && (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-[#252329] hover:text-primary"
+              >
+                Open in Google
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </article>
@@ -631,20 +647,130 @@ function ItineraryStopCard({
   onWhy: () => void;
 }) {
   return (
-    <PhotoPlaceCard
-      title={activity.name}
-      photoSrc={photoSrc}
-      line={activity.address}
-      rating={activity.rating}
-      mapsUrl={googlePlacePageUrl(activity)}
-      onRemove={onRemove}
-      onWhy={activity.whyRecommended ? onWhy : undefined}
-    />
+    <div className="group relative flex gap-3">
+      <div className="relative w-[37%] shrink-0 aspect-[4/3] overflow-hidden rounded-lg">
+        <Image
+          src={withGooglePhotoWidth(photoSrc, 480) || photoSrc}
+          alt={activity.name}
+          fill
+          unoptimized={isGooglePhotoSrc(photoSrc)}
+          className="object-cover"
+          sizes="(max-width: 640px) 37vw, 12vw"
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute top-1.5 right-1.5 z-10 rounded-md bg-white/90 p-1 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-white group-hover:opacity-100"
+          aria-label={`Remove ${activity.name}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="min-w-0 flex-1 pt-0.5">
+        <h4 className="subcontainer-title">{activity.name}</h4>
+        {activity.address && (
+          <p className="mt-0.5 text-sm text-foreground-secondary line-clamp-1">{activity.address}</p>
+        )}
+        {activity.rating != null && activity.rating > 0 && (
+          <p className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-foreground">
+            <Star className="h-3.5 w-3.5" />
+            {activity.rating}
+          </p>
+        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {activity.whyRecommended && (
+            <button
+              type="button"
+              onClick={onWhy}
+              className="subcontainer-link text-sm"
+            >
+              Why this?
+            </button>
+          )}
+          <a
+            href={googlePlacePageUrl(activity)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="subcontainer-link text-sm"
+          >
+            Open in Google
+          </a>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function activityTypeLabel(activity: ActivityRecommendation): string {
-  return activity.category?.trim() || "Other";
+const CATEGORY_ALIASES: Record<string, string> = {
+  restaurant: "Restaurants",
+  restaurants: "Restaurants",
+  cheap: "Restaurants",
+  "mid-range": "Restaurants",
+  "special-occasion": "Restaurants",
+  bar: "Bars",
+  bars: "Bars",
+  cafe: "Cafes",
+  cafes: "Cafes",
+  nightclub: "Nightlife",
+  nightlife: "Nightlife",
+  park: "Parks",
+  parks: "Parks",
+  museum: "Museums",
+  museums: "Museums",
+  attraction: "Attractions",
+  landmark: "Attractions",
+  church: "Attractions",
+  shop: "Shopping",
+  shopping: "Shopping",
+  market: "Markets",
+  markets: "Markets",
+  activity: "Activities",
+  hotel: "Hotels",
+};
+
+function placeCategoryLabel(place: Pick<ActivityRecommendation, "category">): string {
+  const raw = place.category?.trim() || "Other";
+  return CATEGORY_ALIASES[raw.toLowerCase()] ?? raw;
+}
+
+function restaurantAsPlace(restaurant: RestaurantRecommendation): ActivityRecommendation {
+  return {
+    name: restaurant.name,
+    description: restaurant.address || restaurant.location || restaurant.cuisine,
+    price: restaurant.priceRange !== "–" ? restaurant.priceRange : "",
+    duration: "",
+    whyRecommended: restaurant.whyRecommended,
+    bookingUrl: restaurant.bookingUrl,
+    category: restaurant.cuisine?.toLowerCase().includes("bar") ? "Bars" : "Restaurants",
+    provider: restaurant.provider,
+    providerPlaceId: restaurant.providerPlaceId,
+    address: restaurant.address || restaurant.location,
+    latitude: restaurant.latitude,
+    longitude: restaurant.longitude,
+    rating: restaurant.rating,
+    reviewCount: restaurant.reviewCount,
+    mapsUrl: restaurant.mapsUrl,
+    website: restaurant.website,
+    photoUrl: restaurant.photoUrl,
+    source: restaurant.source,
+  };
+}
+
+function mergeTopRatedPlaces(trip: TripPlan | null): ActivityRecommendation[] {
+  if (!trip) return [];
+  const merged: ActivityRecommendation[] = [];
+  const seen = new Set<string>();
+
+  const add = (place: ActivityRecommendation) => {
+    const key = (place.providerPlaceId || place.name).toLowerCase().trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    merged.push({ ...place, category: placeCategoryLabel(place) });
+  };
+
+  for (const activity of trip.activities) add(activity);
+  for (const restaurant of trip.restaurants) add(restaurantAsPlace(restaurant));
+  return merged;
 }
 
 function TypeFilterChip({

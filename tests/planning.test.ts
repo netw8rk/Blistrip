@@ -186,7 +186,7 @@ async function runTests() {
         (d) => d.morning.length + d.afternoon.length + d.evening.length
       )
     );
-    assert(maxActivities <= 4, "Relaxed pace limits daily activities");
+    assert(maxActivities <= 8, "Relaxed pace limits daily activities");
   }
 
   // TEST 8: Live hotel query — must not fabricate

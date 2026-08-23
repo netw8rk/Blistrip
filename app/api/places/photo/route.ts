@@ -12,8 +12,13 @@ export async function GET(request: NextRequest) {
     return new NextResponse("Photos are not configured", { status: 503 });
   }
 
+  const requestedWidth = Number(request.nextUrl.searchParams.get("w"));
+  const maxWidthPx = Number.isFinite(requestedWidth)
+    ? Math.min(4800, Math.max(200, Math.round(requestedWidth)))
+    : 800;
+
   const lookup = await fetch(
-    `https://places.googleapis.com/v1/${name}/media?maxWidthPx=800&skipHttpRedirect=true&key=${key}`
+    `https://places.googleapis.com/v1/${name}/media?maxWidthPx=${maxWidthPx}&skipHttpRedirect=true&key=${key}`
   );
 
   if (!lookup.ok) {

@@ -51,7 +51,7 @@ function validateDailyItinerary(
     return;
   }
 
-  const maxPerDay = context.pace === "slow" ? 4 : context.pace === "packed" ? 8 : 6;
+  const maxPerDay = context.pace === "slow" ? 8 : context.pace === "packed" ? 14 : 12;
 
   for (const day of plan.dailyItinerary) {
     const activities = [...(day.morning || []), ...(day.afternoon || []), ...(day.evening || [])];

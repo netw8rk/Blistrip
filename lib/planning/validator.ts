@@ -7,9 +7,9 @@ import type {
 } from "./types";
 
 const PACE_MAX_ACTIVITIES: Record<string, number> = {
-  slow: 4,
-  balanced: 6,
-  packed: 8,
+  slow: 8,
+  balanced: 12,
+  packed: 14,
 };
 
 export function validateStructuredItinerary(
@@ -86,7 +86,7 @@ export function validateStructuredItinerary(
     });
   }
 
-  if (context.dislikes.includes("museums")) {
+  if (context.dislikes?.includes("museums")) {
     const museumCount = draft.days.reduce(
       (sum, d) =>
         sum +
@@ -139,19 +139,21 @@ export function validateTripPlan(
     });
   }
 
-  const breakdownTotal =
-    plan.budgetBreakdown.accommodation +
-    plan.budgetBreakdown.food +
-    plan.budgetBreakdown.activities +
-    plan.budgetBreakdown.transportation +
-    plan.budgetBreakdown.other;
+  if (plan.budgetBreakdown) {
+    const breakdownTotal =
+      plan.budgetBreakdown.accommodation +
+      plan.budgetBreakdown.food +
+      plan.budgetBreakdown.activities +
+      plan.budgetBreakdown.transportation +
+      plan.budgetBreakdown.other;
 
-  if (Math.abs(breakdownTotal - plan.estimatedBudget) > plan.estimatedBudget * 0.2) {
-    issues.push({
-      code: "budget_inconsistent",
-      message: "Budget breakdown doesn't align with estimated total.",
-      severity: "warning",
-    });
+    if (Math.abs(breakdownTotal - plan.estimatedBudget) > plan.estimatedBudget * 0.2) {
+      issues.push({
+        code: "budget_inconsistent",
+        message: "Budget breakdown doesn't align with estimated total.",
+        severity: "warning",
+      });
+    }
   }
 
   const errors = issues.filter((i) => i.severity === "error");

@@ -8,28 +8,46 @@ const SLOT_HOURS: Record<DaySlot, [number, number]> = {
 
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
-export function isOpenDuringSlot(
+export function getOpeningRange(
   openingHours: string[] | undefined,
-  slot: DaySlot,
   weekday = 1
-): boolean {
-  if (!openingHours?.length) return true;
+): { open: number; close: number } | "unknown" | "closed" | "always" {
+  if (!openingHours?.length) return "unknown";
 
   const joined = openingHours.join(" ").toLowerCase();
-  if (/24\s*\/\s*7|24 hours|open 24/.test(joined)) return true;
+  if (/24\s*\/\s*7|24 hours|open 24/.test(joined)) return "always";
 
   const dayName = WEEKDAYS[((weekday % 7) + 7) % 7];
   const line =
     openingHours.find((entry) => entry.toLowerCase().startsWith(dayName)) ??
     openingHours.find((entry) => entry.toLowerCase().includes(dayName));
 
-  if (line && /\bclosed\b/i.test(line)) return false;
+  if (line && /\bclosed\b/i.test(line)) return "closed";
 
   const range = parseClockRange(line) ?? parseOsmRange(joined, weekday);
-  if (!range) return true;
+  if (!range) return "unknown";
+  if (range.close <= range.open && range.close === 0) return "closed";
+  return range;
+}
+
+export function isOpenDuringSlot(
+  openingHours: string[] | undefined,
+  slot: DaySlot,
+  weekday = 1
+): boolean {
+  const range = getOpeningRange(openingHours, weekday);
+  if (range === "closed") return false;
+  if (range === "unknown" || range === "always") return true;
 
   const [slotStart, slotEnd] = SLOT_HOURS[slot];
   return range.open < slotEnd && range.close > slotStart;
+}
+
+export function opensForBreakfast(openingHours: string[] | undefined, weekday = 1): boolean {
+  const range = getOpeningRange(openingHours, weekday);
+  if (range === "closed") return false;
+  if (range === "unknown" || range === "always") return false;
+  return range.open <= 10.5;
 }
 
 export function parseClockRange(line?: string): { open: number; close: number } | null {

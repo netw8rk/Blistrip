@@ -9,6 +9,7 @@ import {
 } from "@/lib/travel/retrieve-places";
 import type { UserTripPreferences } from "./preferences";
 import { isOpenDuringSlot, type DaySlot } from "@/lib/travel/opening-hours";
+import { placeTypeFitsSlot } from "./slot-fit";
 
 const MAX_REPAIRS = 2;
 
@@ -35,7 +36,7 @@ export function runCriticRepairLoop(
     const constrained = constrainItineraryToPool(current, retrieval, prefs);
     current = constrained.plan;
     current.dailyItinerary = mergeEmptyDays(current.dailyItinerary, assembledDays);
-    current = dropClosedStops(current, retrieval);
+    current = dropClosedStops(current, retrieval, prefs);
     current = ensureItineraryFilled(current, retrieval, prefs);
 
     const tripCheck = validateTripPlan(
@@ -57,7 +58,7 @@ export function runCriticRepairLoop(
 
   current = constrainItineraryToPool(current, retrieval, prefs).plan;
   current.dailyItinerary = mergeEmptyDays(current.dailyItinerary, assembledDays);
-  current = dropClosedStops(current, retrieval);
+  current = dropClosedStops(current, retrieval, prefs);
   current = ensureItineraryFilled(current, retrieval, prefs);
   return { plan: current, attempts, issues, repaired: attempts > 0 };
 }
@@ -83,7 +84,8 @@ function mergeEmptyDays(
 
 function dropClosedStops(
   plan: Omit<TripPlan, "id" | "createdAt">,
-  retrieval: PlaceRetrievalResult
+  retrieval: PlaceRetrievalResult,
+  prefs: UserTripPreferences
 ): Omit<TripPlan, "id" | "createdAt"> {
   const hoursById = new Map<string, string[] | undefined>();
   for (const item of [...retrieval.ranked, ...retrieval.selected, ...retrieval.diningAndNightlife]) {
@@ -94,11 +96,12 @@ function dropClosedStops(
 
   const keep = (slot: DaySlot, activities: TripPlan["dailyItinerary"][number]["morning"]) =>
     activities.filter((activity) => {
-      if (activity.type === "experience") return true;
+      if (!activity.type || activity.type === "experience") return true;
       const hours =
         (activity.providerPlaceId ? hoursById.get(activity.providerPlaceId) : undefined) ??
         hoursById.get(activity.name.toLowerCase());
-      return isOpenDuringSlot(hours, slot);
+      if (!isOpenDuringSlot(hours, slot)) return false;
+      return placeTypeFitsSlot(activity.type, slot, prefs, { openInSlot: true });
     });
 
   return {
