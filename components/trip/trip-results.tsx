@@ -272,22 +272,41 @@ export function TripResults({ tripId }: TripResultsProps) {
       </section>
 
       <section className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 py-12 border-t border-border">
-        <p className="eyebrow mb-2">Stay</p>
-        <h2 className="text-2xl sm:text-3xl font-bold mb-8">Where to stay</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+        <p className="mb-3 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[13px]">
+          Stay
+        </p>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl leading-[1.15] mb-2">
+          Where to stay
+        </h2>
+        <p className="text-base text-foreground-secondary mb-10 max-w-xl">
+          Stays near your days, matched to {trip.nightlyStayBudget ? `${formatCurrency(trip.nightlyStayBudget)}/night` : "your nightly budget"}.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
           {trip.hotelRecommendations.map((hotel) => (
-            <PhotoPlaceCard
-              key={hotel.name}
-              title={hotel.name}
-              photoSrc={hotel.photoUrl || getPlaceFallbackImage(hotel.name, trip.destination, 1600)}
-              category="Hotel"
-              line={[hotel.address || hotel.neighborhood, hotel.priceRange !== "Check current rates" ? hotel.priceRange : ""]
-                .filter(Boolean)
-                .join(" · ")}
-              rating={hotel.rating}
-              reviewCount={hotel.reviewCount}
-              mapsUrl={googlePlacePageUrl(hotel)}
-            />
+            <div
+              key={hotel.providerPlaceId || hotel.name}
+              className="rounded-[var(--radius-card)] border border-border px-3 py-3 sm:px-4 sm:py-4"
+            >
+              <ItineraryStopCard
+                activity={{
+                  name: hotel.name,
+                  description: hotel.whyRecommended,
+                  whyRecommended: hotel.whyRecommended,
+                  address: hotel.address || hotel.neighborhood,
+                  rating: hotel.rating,
+                  mapsUrl: googlePlacePageUrl(hotel),
+                  photoUrl: hotel.photoUrl,
+                  providerPlaceId: hotel.providerPlaceId,
+                }}
+                photoSrc={hotel.photoUrl || getPlaceFallbackImage(hotel.name, trip.destination, 1600)}
+                detail={hotel.priceRange !== "Check current rates" ? hotel.priceRange : undefined}
+                onWhy={
+                  hotel.whyRecommended
+                    ? () => setWhyDialog({ title: hotel.name, reason: hotel.whyRecommended })
+                    : undefined
+                }
+              />
+            </div>
           ))}
         </div>
       </section>
@@ -653,11 +672,13 @@ function ItineraryStopCard({
   photoSrc,
   onRemove,
   onWhy,
+  detail,
 }: {
   activity: ItineraryActivity;
   photoSrc: string;
-  onRemove: () => void;
-  onWhy: () => void;
+  onRemove?: () => void;
+  onWhy?: () => void;
+  detail?: string;
 }) {
   return (
     <div className="group relative flex gap-3">
@@ -670,20 +691,23 @@ function ItineraryStopCard({
           className="object-cover"
           sizes="(max-width: 640px) 37vw, 12vw"
         />
-        <button
-          type="button"
-          onClick={onRemove}
-          className="absolute top-1.5 right-1.5 z-10 rounded-md bg-background/90 p-1 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-surface group-hover:opacity-100"
-          aria-label={`Remove ${activity.name}`}
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="absolute top-1.5 right-1.5 z-10 rounded-md bg-background/90 p-1 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-surface group-hover:opacity-100"
+            aria-label={`Remove ${activity.name}`}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
       <div className="min-w-0 flex-1 pt-0.5">
         <h4 className="subcontainer-title">{activity.name}</h4>
         {activity.address && (
           <p className="mt-0.5 text-sm text-foreground-secondary line-clamp-1">{activity.address}</p>
         )}
+        {detail && <p className="mt-0.5 text-sm text-foreground-secondary">{detail}</p>}
         {activity.rating != null && activity.rating > 0 && (
           <p className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-foreground">
             <Star className="h-3.5 w-3.5" />
@@ -691,7 +715,7 @@ function ItineraryStopCard({
           </p>
         )}
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-          {activity.whyRecommended && (
+          {onWhy && activity.whyRecommended && (
             <button
               type="button"
               onClick={onWhy}

@@ -31,36 +31,38 @@ export default function ExplorePage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {destinations.map((dest) => (
-          <article key={dest.id} className="group relative overflow-hidden rounded-[var(--radius-card)] isolate">
+          <article
+            key={dest.id}
+            className="group relative overflow-hidden rounded-[var(--radius-card)] border border-border/70 isolate"
+          >
             <Link
               href={`/planner?destination=${encodeURIComponent(dest.name)}`}
               onClick={() => handleDestinationClick(dest.name)}
               className="block"
             >
-              <div className="relative aspect-[5/4]">
+              <div className="relative aspect-[11/10]">
                 <Image
                   src={dest.imageUrl}
                   alt={`${dest.name}, ${dest.country}`}
                   fill
-                  className="object-cover"
+                  className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                   sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw"
                   quality={85}
-                />
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      "linear-gradient(to top, #f4f0e7 0%, #f4f0e7 18%, rgba(244,240,231,0.9) 36%, rgba(244,240,231,0.45) 58%, rgba(244,240,231,0) 78%)",
-                  }}
                 />
                 <Badge variant="secondary" className="absolute top-2 left-2 z-10 bg-background/90 text-xs">
                   {dest.country}
                 </Badge>
-                <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-                  <h3 className="text-[15px] font-semibold leading-5 text-foreground line-clamp-2">{dest.name}</h3>
+                <div
+                  className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-10"
+                  style={{
+                    background:
+                      "linear-gradient(to top, #f4f0e7 0%, #f4f0e7 42%, rgba(244,240,231,0.92) 62%, rgba(244,240,231,0.4) 82%, transparent 100%)",
+                  }}
+                >
+                  <h3 className="text-[15px] font-semibold leading-5 text-foreground line-clamp-1">{dest.name}</h3>
                   <p className="mt-0.5 text-xs leading-4 text-foreground-secondary line-clamp-1">{dest.description}</p>
-                  <p className="mt-1 text-xs font-medium text-foreground">{dest.typicalBudget}</p>
-                  <div className="mt-2">
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-foreground">{dest.typicalBudget}</p>
                     <span className="text-xs font-medium text-primary group-hover:text-primary-hover">
                       Plan this trip
                     </span>

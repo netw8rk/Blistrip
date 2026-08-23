@@ -1,4 +1,5 @@
 import type { PlaceType } from "@/lib/travel/types";
+import { hotelSearchPhrase } from "./nightly-budget";
 import { diningSearchPhrase, type PreferenceScores, type UserTripPreferences } from "./preferences";
 import type { TripProfile } from "./trip-profile";
 
@@ -19,7 +20,17 @@ type SearchableProfile = Pick<UserTripPreferences, "destination" | "scores" | "b
   cuisineHints?: string[];
   interests?: string[];
   selectedInterests?: string[];
+  budgetAmount?: number;
 };
+
+function nightlyFromProfile(profile: SearchableProfile | TripProfile): number {
+  if (typeof profile.budgetAmount === "number" && profile.budgetAmount > 0) {
+    return profile.budgetAmount;
+  }
+  if (profile.budgetLevel === "low") return 65;
+  if (profile.budgetLevel === "high") return 400;
+  return 200;
+}
 
 const DAYTIME_QUERY_IDS = [
   "museums",
@@ -117,13 +128,7 @@ export function buildSearchRequirements(profile: SearchableProfile | TripProfile
   requirements.push({
     id: "hotels",
     category: "hotel",
-    query: `${
-      profile.budgetLevel === "low"
-        ? "budget hotels hostels guesthouses"
-        : profile.budgetLevel === "high"
-          ? "upscale hotels boutique hotels"
-          : "hotels"
-    } in ${place}`,
+    query: `${hotelSearchPhrase(nightlyFromProfile(profile))} in ${place}`,
     placeType: "hotel",
     priority: 5,
     slot: "any",

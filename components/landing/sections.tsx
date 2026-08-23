@@ -264,7 +264,7 @@ export function WhyBlistripSection() {
   ];
 
   return (
-    <section className="border-t border-border bg-background py-10 lg:py-12">
+    <section className="border-t border-border section-raised py-10 lg:py-12">
       <div className="mx-auto max-w-[84rem] px-4 sm:px-6 lg:px-8">
         <div className="mb-8 max-w-xl lg:mb-9">
           <p className="mb-3 text-xs font-medium uppercase tracking-[0.1em] text-foreground font-sub sm:text-[14px]">
@@ -304,7 +304,7 @@ export function ExampleTripSection() {
   const trip = examplePragueTrip;
 
   return (
-    <section className="py-20 section-alt border-t border-border">
+    <section className="py-20 section-base border-t border-border">
       <div className="mx-auto max-w-[84rem] px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-start">
           <div>

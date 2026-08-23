@@ -12,6 +12,7 @@ import type {
 import { googlePhotoUrls } from "../google-links";
 import { getCached, setCache } from "../cache";
 import { deriveProviderTags } from "../place-tags";
+import { googlePriceLevelEnums } from "@/lib/planning/nightly-budget";
 
 const GOOGLE_PLACES_BASE = "https://places.googleapis.com/v1";
 
@@ -377,6 +378,8 @@ export class GooglePlacesProvider implements TravelDataProvider {
         textQuery,
         params.type ?? "",
         params.pageToken ?? "",
+        params.minPriceLevel ?? "",
+        params.maxPriceLevel ?? "",
       ].join(":");
       const cached = getCached<PlaceSearchResult>(cacheKey);
       if (cached) return { ...cached, cached: true };
@@ -410,6 +413,16 @@ export class GooglePlacesProvider implements TravelDataProvider {
         body.includedType = includedType;
       }
 
+      if (
+        (params.minPriceLevel != null || params.maxPriceLevel != null) &&
+        includedType !== "lodging"
+      ) {
+        body.priceLevels = googlePriceLevelEnums({
+          min: params.minPriceLevel,
+          max: params.maxPriceLevel,
+        });
+      }
+
       const res = await fetch(`${GOOGLE_PLACES_BASE}/places:searchText`, {
         method: "POST",
         headers: {
@@ -440,11 +453,13 @@ export class GooglePlacesProvider implements TravelDataProvider {
         .filter((place) => !isExcludedGoogleTypes(place.types) && place.businessStatus !== "CLOSED_PERMANENTLY")
         .map((place) => normalizePlace(place, params.city, params.country ?? ""));
 
-      if (params.maxPriceLevel != null) {
-        places = places.filter(
-          (p) =>
-            p.priceLevel === undefined || p.priceLevel <= params.maxPriceLevel!
-        );
+      if (params.minPriceLevel != null || params.maxPriceLevel != null) {
+        places = places.filter((p) => {
+          if (p.priceLevel == null) return true;
+          if (params.minPriceLevel != null && p.priceLevel < params.minPriceLevel) return false;
+          if (params.maxPriceLevel != null && p.priceLevel > params.maxPriceLevel) return false;
+          return true;
+        });
       }
 
       const limit = params.limit ?? places.length;

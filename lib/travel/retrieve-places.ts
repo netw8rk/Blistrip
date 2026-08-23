@@ -27,7 +27,12 @@ import { GooglePlacesProvider, isExcludedGoogleTypes } from "./providers/google-
 import { cityHeroQueries, pickCityHeroPhoto } from "./city-hero-photo";
 import type { BudgetEstimate, PlannedActivity, StructuredItineraryDraft } from "@/lib/planning/types";
 import { draftToDailyItinerary } from "@/lib/planning/merge";
-import { accommodationFromNightly, googleHotelMaxPriceLevel } from "@/lib/planning/nightly-budget";
+import {
+  accommodationFromNightly,
+  googleHotelPriceRange,
+  hotelFitsNightlyBudget,
+  inferHotelPriceLevel,
+} from "@/lib/planning/nightly-budget";
 import { OpenStreetMapProvider, type OsmCategoryQuery } from "./providers/openstreetmap";
 
 export interface RankedPlace {
@@ -368,7 +373,7 @@ export async function retrievePersonalizedPlaces(
 
   const needed = Math.max(prefs.tripLength * activitiesPerDay(prefs), prefs.tripLength * 10);
   const selected = pickDiverseSelection(dayPlaces, Math.max(needed, 60), prefs);
-  const hotelsSlice = hotels.slice(0, 6);
+  const hotelsSlice = hotels.slice(0, 16);
   const restaurantsSlice = restaurants.slice(0, 24);
   const diningSlice = diningAndNightlife.slice(0, 24);
   const topRated = pickTopRatedMix(dayPlaces, 32);
@@ -552,19 +557,24 @@ export function scorePlace(place: NormalizedPlace, prefs: UserTripPreferences): 
 
   if (prefs.budgetLevel === "low") {
     if (["cafe", "market", "park", "hostel"].includes(type)) add(SCORING_WEIGHTS.budgetFit, "budget-friendly type");
-    if (type === "hotel" && prefs.travelStyle !== "Luxury") score -= 4;
-    if (place.priceLevel != null && place.priceLevel >= 3) score -= 8;
+    if (place.priceLevel != null && place.priceLevel >= 3 && !lodgingType(type)) score -= 8;
   }
-  if (prefs.budgetLevel === "high" && (type === "hotel" || type === "restaurant")) {
+  if (prefs.budgetLevel === "high" && type === "restaurant") {
     add(6, "fits higher-budget trip");
   }
   if (type === "hotel" || type === "hostel") {
-    const target = googleHotelMaxPriceLevel(prefs.budgetAmount) ?? 4;
-    if (place.priceLevel != null && place.priceLevel <= target) {
-      add(SCORING_WEIGHTS.budgetFit, "fits nightly stay budget");
-    } else if (place.priceLevel != null && place.priceLevel > target) {
-      score -= 10;
-      reasons.push("above selected nightly stay budget");
+    const range = googleHotelPriceRange(prefs.budgetAmount);
+    const estimated = inferHotelPriceLevel(place.name, type, place.priceLevel);
+    if (estimated != null) {
+      if (range.max != null && estimated > range.max) {
+        score -= 18;
+        reasons.push("above selected nightly stay budget");
+      } else if (range.min != null && estimated < range.min - 1) {
+        score -= 8;
+        reasons.push("below selected nightly stay budget");
+      } else {
+        add(SCORING_WEIGHTS.budgetFit + 6, "fits nightly stay budget");
+      }
     }
   }
 
@@ -782,7 +792,7 @@ async function searchGoogleRequirements(
         radiusMeters: 30000,
         limit: 20,
         minRating: requirement.minRating,
-        maxPriceLevel: requirement.id === "hotels" ? googleHotelMaxPriceLevel(prefs.budgetAmount) : undefined,
+        ...(requirement.id === "hotels" ? googleHotelPriceRange(prefs.budgetAmount) : {}),
       });
       let places = first.places;
       if (requirement.priority >= 8 && first.nextPageToken) {
@@ -796,7 +806,7 @@ async function searchGoogleRequirements(
           radiusMeters: 30000,
           limit: 20,
           minRating: requirement.minRating,
-          maxPriceLevel: requirement.id === "hotels" ? googleHotelMaxPriceLevel(prefs.budgetAmount) : undefined,
+          ...(requirement.id === "hotels" ? googleHotelPriceRange(prefs.budgetAmount) : {}),
           pageToken: first.nextPageToken,
         });
         places = [...places, ...next.places];
@@ -1245,6 +1255,56 @@ function lodgingType(type: PlaceType | string): boolean {
   return type === "hotel" || type === "hostel" || type === "apartment";
 }
 
+export function placesCentroid(
+  places: Array<{ latitude?: number; longitude?: number }>
+): { lat: number; lon: number } | null {
+  const geo = places.filter((place) => place.latitude != null && place.longitude != null);
+  if (!geo.length) return null;
+  return {
+    lat: geo.reduce((sum, place) => sum + place.latitude!, 0) / geo.length,
+    lon: geo.reduce((sum, place) => sum + place.longitude!, 0) / geo.length,
+  };
+}
+
+export function selectStayHotels(
+  hotels: RankedPlace[],
+  prefs: UserTripPreferences,
+  near?: { lat: number; lon: number } | null,
+  limit = 3
+): RankedPlace[] {
+  const fitting = hotels.filter((item) =>
+    hotelFitsNightlyBudget(prefs.budgetAmount, item.place.name, item.place.type, item.place.priceLevel)
+  );
+  const pool = fitting.length >= Math.min(limit, hotels.length) ? fitting : hotels;
+
+  const scored = pool.map((item) => {
+    let score = item.score;
+    if (near && item.place.latitude != null && item.place.longitude != null) {
+      const km = haversineKm(item.place.latitude, item.place.longitude, near.lat, near.lon);
+      if (km <= 2) score += 8;
+      else if (km <= 5) score += 4;
+      else if (km > 12) score -= 6;
+    }
+    return { item, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+
+  const picked: RankedPlace[] = [];
+  const usedChains = new Set<string>();
+  for (const { item } of scored) {
+    const chain = hotelChainKey(item.place.name);
+    if (chain && usedChains.has(chain) && picked.length + 1 < limit) continue;
+    picked.push(item);
+    if (chain) usedChains.add(chain);
+    if (picked.length >= limit) break;
+  }
+  return picked;
+}
+
+function hotelChainKey(name: string): string {
+  return name.toLowerCase().replace(/^the\s+/, "").split(/[\s-]/)[0] ?? "";
+}
+
 function toItineraryFiller(item: RankedPlace, prefs: UserTripPreferences): ItineraryActivity {
   return {
     name: item.place.name,
@@ -1468,13 +1528,21 @@ export function constrainItineraryToPool(
     return { ...day, ...slots };
   });
 
-  const hotelRecs = (retrieval.hotels.length ? retrieval.hotels : []).slice(0, 3).map((item) => {
+  const stayCenter = placesCentroid([
+    ...retrieval.selected.map((item) => item.place),
+    ...dailyItinerary.flatMap((day) => [...day.morning, ...day.afternoon, ...day.evening]),
+  ]);
+  const hotelRecs = selectStayHotels(
+    retrieval.hotels.length ? retrieval.hotels : [],
+    prefs,
+    stayCenter
+  ).map((item) => {
     const existing = plan.hotelRecommendations.find(
       (h) => h.name.toLowerCase() === item.place.name.toLowerCase()
     );
     return toHotelRecommendation(
       item.place as import("./types").NormalizedHotel,
-      existing?.whyRecommended,
+      existing?.whyRecommended || item.reasons[0],
       prefs.budgetLabel
     );
   });
@@ -1561,7 +1629,8 @@ export function buildPlanFromRetrieval(
     retrieval.city
   );
   const stay = accommodationFromNightly(prefs.budgetAmount, prefs.tripLength, prefs.travelers);
-  const hotelRecs = retrieval.hotels.slice(0, 3).map((item) =>
+  const stayCenter = placesCentroid(retrieval.selected.map((item) => item.place));
+  const hotelRecs = selectStayHotels(retrieval.hotels, prefs, stayCenter).map((item) =>
     toHotelRecommendation(
       item.place as import("./types").NormalizedHotel,
       item.reasons[0],

@@ -58,6 +58,7 @@ export interface PlaceSearchParams {
   longitude?: number;
   radiusMeters?: number;
   minRating?: number;
+  minPriceLevel?: number;
   maxPriceLevel?: number;
   limit?: number;
   pageToken?: string;

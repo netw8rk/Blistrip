@@ -607,9 +607,61 @@ async function runTests() {
   assert(deriveProviderTags({ type: "attraction", reviewCount: 5000 }).includes("popular"), "high review count is tagged popular");
 
   console.log("\nNightly stay budget:");
-  const { parseNightlyBudget, accommodationFromNightly, nightlyStayLabel } = await import("../lib/planning/nightly-budget");
+  const { parseNightlyBudget, accommodationFromNightly, nightlyStayLabel, hotelSearchPhrase, inferHotelPriceLevel } = await import("../lib/planning/nightly-budget");
+  const { selectStayHotels } = await import("../lib/travel/retrieve-places");
   assert(parseNightlyBudget("$150–$250/night") === 200, "mid band is $200 a night");
   assert(nightlyStayLabel("$150–$250/night") === "$150–$250/night", "hotel cards use the selected nightly label");
+  assert(hotelSearchPhrase(65).includes("hostel"), "under $80 searches hostels and budget stays");
+  assert(hotelSearchPhrase(500).includes("luxury"), "top band searches luxury hotels");
+  assert(
+    requirementSets.find((item) => item.label === "Budget traveler")!.reqs.find((item) => item.id === "hotels")!.query !==
+      requirementSets.find((item) => item.label === "Luxury traveler")!.reqs.find((item) => item.id === "hotels")!.query,
+    "budget and luxury trips send different hotel searches"
+  );
+  assert(inferHotelPriceLevel("The Ritz-Carlton Charlotte") === 4, "Ritz is treated as luxury");
+  assert(inferHotelPriceLevel("Charlotte Hostel") === 1, "hostels are treated as budget");
+
+  const ritz = { ...basePlace, id: "ritz", name: "The Ritz-Carlton Charlotte", type: "hotel" as const, rating: 4.7, reviewCount: 3000, providerPlaceId: "ritz" };
+  const hostel = { ...basePlace, id: "host", name: "Charlotte Hostel", type: "hostel" as const, rating: 4.4, reviewCount: 800, providerPlaceId: "host" };
+  const budgetPrefs = buildUserPreferences({
+    destination: "Charlotte",
+    destinationUnknown: false,
+    flexibleDates: true,
+    budget: "Under $80/night",
+    travelers: "Solo",
+    interests: ["Food"],
+    travelStyle: "Budget",
+    pace: "Balanced",
+  });
+  const luxuryPrefs = buildUserPreferences({
+    destination: "Charlotte",
+    destinationUnknown: false,
+    flexibleDates: true,
+    budget: "$400+/night",
+    travelers: "Couple",
+    interests: ["Food"],
+    travelStyle: "Luxury",
+    pace: "Balanced",
+  });
+  assert(
+    scorePlace(hostel, budgetPrefs).score > scorePlace(ritz, budgetPrefs).score,
+    "budget trips prefer hostels over luxury hotels"
+  );
+  assert(
+    scorePlace(ritz, luxuryPrefs).score > scorePlace(hostel, luxuryPrefs).score,
+    "luxury trips prefer luxury hotels over hostels"
+  );
+  const nearbyHostel = { ...hostel, latitude: 35.2271, longitude: -80.8431 };
+  const farRitz = { ...ritz, latitude: 35.4, longitude: -80.5 };
+  const picked = selectStayHotels(
+    [
+      { place: farRitz, score: 20, reasons: [] },
+      { place: nearbyHostel, score: 12, reasons: [] },
+    ],
+    budgetPrefs,
+    { lat: 35.2271, lon: -80.8431 }
+  );
+  assert(picked[0]?.place.name === "Charlotte Hostel", "stay picks the hotel that fits budget near the itinerary");
   const coupleStay = accommodationFromNightly(200, 5, "Couple");
   assert(coupleStay.nights === 4 && coupleStay.rooms === 1 && coupleStay.amount === 800, "5-day couple stay is $200 × 4 nights");
   const friendsStay = accommodationFromNightly(200, 5, "Friends");
