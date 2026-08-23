@@ -1,6 +1,8 @@
 import type { TripPlannerInput, TripPlan } from "@/types/trip";
 import { getAffiliateUrl } from "@/lib/affiliate";
-import { calculateDuration, generateId, parseBudgetRange } from "@/lib/utils";
+import { calculateDuration, generateId } from "@/lib/utils";
+import { estimateTripBudget } from "@/lib/planning/budget";
+import { accommodationFromNightly, nightlyStayLabel, parseNightlyBudget } from "@/lib/planning/nightly-budget";
 import { getDestinationByName } from "@/lib/destinations";
 
 const destinationData: Record<string, Partial<TripPlan>> = {
@@ -384,7 +386,23 @@ export function generateMockTrip(input: TripPlannerInput): TripPlan {
     : inferDestination(input);
   const destInfo = getDestinationByName(destination);
   const duration = calculateDuration(input.startDate, input.endDate, input.flexibleDates);
-  const budget = parseBudgetRange(input.budget, input.customBudget);
+  const nightly = parseNightlyBudget(input.budget, input.customBudget);
+  const stay = accommodationFromNightly(nightly, duration, input.travelers);
+  const stayLabel = nightlyStayLabel(input.budget, input.customBudget);
+  const estimate = estimateTripBudget(
+    {
+      destination,
+      tripLength: duration,
+      travelers: input.travelers,
+      interests: [],
+      dislikes: [],
+      clarifyingQuestions: [],
+      fieldStates: {},
+      mode: "specific_destination",
+      budgetAmount: nightly,
+    },
+    null
+  );
   const interests = input.interests.length > 0 ? input.interests : ["History", "Food", "Culture"];
   const countryMatches =
     !input.destinationCountry ||
@@ -418,7 +436,10 @@ export function generateMockTrip(input: TripPlannerInput): TripPlan {
     destinationLongitude: input.destinationLongitude,
     dates,
     duration,
-    estimatedBudget: budget,
+    estimatedBudget: estimate.total,
+    nightlyStayBudget: stay.nightly,
+    stayNights: stay.nights,
+    stayRooms: stay.rooms,
     travelStyle: input.travelStyle,
     interests,
     recommendedNeighborhood: baseData.recommendedNeighborhood ?? "City Center",
@@ -426,6 +447,7 @@ export function generateMockTrip(input: TripPlannerInput): TripPlan {
     neighborhoods: baseData.neighborhoods ?? [],
     hotelRecommendations: (baseData.hotelRecommendations ?? []).map((h) => ({
       ...h,
+      priceRange: stayLabel,
       bookingUrl: getAffiliateUrl("hotel", h.name, destination),
     })),
     activities: (baseData.activities ?? []).map((a) => ({
@@ -438,7 +460,13 @@ export function generateMockTrip(input: TripPlannerInput): TripPlan {
     })),
     transportation: baseData.transportation ?? ["Use public transit where available.", "Book airport transfers in advance."],
     dailyItinerary: buildDailyItinerary(destination, duration, interests),
-    budgetBreakdown: buildBudgetBreakdown(budget),
+    budgetBreakdown: {
+      accommodation: estimate.accommodation.amount,
+      food: estimate.food.amount,
+      activities: estimate.activities.amount,
+      transportation: estimate.transportation.amount,
+      other: estimate.other.amount,
+    },
     travelTips: baseData.travelTips ?? ["Book popular restaurants ahead.", "Carry a reusable water bottle."],
     packingRecommendations: baseData.packingRecommendations ?? ["Comfortable walking shoes", "Universal adapter"],
     travelEssentials: travelEssentials.map((p) => ({

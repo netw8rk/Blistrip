@@ -10,7 +10,11 @@ export const metadata: Metadata = {
 
 export default function PlannerPage() {
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-background">
+    <div className="relative min-h-[calc(100vh-4rem)] overflow-hidden bg-background">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-primary-glow/80 to-transparent"
+      />
       <Suspense fallback={<PlannerFallback />}>
         <TripPlanner />
       </Suspense>

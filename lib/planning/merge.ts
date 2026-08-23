@@ -1,4 +1,5 @@
 import type { DailyItinerary, ItineraryActivity, TripPlan } from "@/types/trip";
+import { accommodationFromNightly } from "./nightly-budget";
 import type {
   BudgetEstimate,
   StructuredItineraryDraft,
@@ -118,14 +119,13 @@ export function formatDiscoveryForPrompt(
 
 export function formatBudgetForPrompt(budget: BudgetEstimate): string {
   return `\n--- BUDGET ESTIMATE (ESTIMATED — NOT LIVE PRICES) ---\n` +
+    `Stay budget is PRICE PER NIGHT. Accommodation already equals nightly rate × nights × rooms.\n` +
     `Accommodation: ~$${budget.accommodation.amount} (${budget.accommodation.confidence})\n` +
     `Food: ~$${budget.food.amount} (${budget.food.confidence})\n` +
     `Activities: ~$${budget.activities.amount} (${budget.activities.confidence})\n` +
     `Transportation: ~$${budget.transportation.amount} (${budget.transportation.confidence})\n` +
-    `Total: ~$${budget.total}\n` +
-    (budget.exceedsBudget
-      ? `⚠ Over budget by ~$${budget.overage}. Suggestions: ${budget.optimizationSuggestions?.join(" ")}\n`
-      : "") +
+    `Total trip estimate: ~$${budget.total}\n` +
+    `Do not change accommodation to a different nightly rate.\n` +
     `--- END BUDGET ESTIMATE ---\n`;
 }
 
@@ -144,6 +144,9 @@ export function buildPlanFromEngine(
   }));
 
   const topNeighborhood = retrieved?.neighborhoods[0];
+  const stay = context.budgetAmount
+    ? accommodationFromNightly(context.budgetAmount, draft.duration, context.travelers)
+    : null;
 
   return {
     tripSummary: `A ${draft.duration}-day ${draft.pace}-pace trip to ${draft.destination}, grouped by neighborhood so nearby stops stay together.`,
@@ -152,6 +155,9 @@ export function buildPlanFromEngine(
     dates: context.dates ? `${context.dates.start} – ${context.dates.end}` : "Flexible dates",
     duration: draft.duration,
     estimatedBudget: budgetEstimate.total,
+    nightlyStayBudget: stay?.nightly,
+    stayNights: stay?.nights,
+    stayRooms: stay?.rooms,
     travelStyle: context.interests[0] ?? "culture",
     interests: context.interests.map((i) => i.charAt(0).toUpperCase() + i.slice(1)),
     recommendedNeighborhood: topNeighborhood?.name ?? "City Center",

@@ -19,6 +19,8 @@ export function Footer() {
             <ul className="space-y-2.5 text-sm text-foreground-secondary">
               <li><Link href="/planner" className="hover:text-primary transition-colors">Plan a Trip</Link></li>
               <li><Link href="/explore" className="hover:text-primary transition-colors">Explore</Link></li>
+              <li><Link href="/stays-flights" className="hover:text-primary transition-colors">Stays/Flights</Link></li>
+              <li><Link href="/deals" className="hover:text-primary transition-colors">Deals</Link></li>
               <li><Link href="/saved" className="hover:text-primary transition-colors">Saved Trips</Link></li>
             </ul>
           </div>

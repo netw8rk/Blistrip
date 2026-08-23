@@ -187,13 +187,17 @@ function indexReasons(plan: Omit<TripPlan, "id" | "createdAt">): Map<string, str
   return map;
 }
 
-export function toHotelRecommendation(place: NormalizedHotel, why?: string): HotelRecommendation {
+export function toHotelRecommendation(
+  place: NormalizedHotel,
+  why?: string,
+  nightlyLabel?: string
+): HotelRecommendation {
   return {
     name: place.name,
     description: place.address
       ? `${place.address}`
       : `${titleCase(place.type)} in ${place.city}.`,
-    priceRange: formatPriceLevel(place.priceLevel) ?? "Check current rates",
+    priceRange: nightlyLabel || formatPriceLevel(place.priceLevel) || "Check current rates",
     whyRecommended:
       why ?? `${titleCase(place.type)} in ${place.city}${place.address ? ` at ${place.address}` : ""}.`,
     rating: place.rating ?? 0,

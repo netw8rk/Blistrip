@@ -2,6 +2,7 @@ import type { TripPlan, ItineraryActivity } from "@/types/trip";
 import type { EnhancedTripPlanningContext, ValidationIssue, ValidationResult } from "@/lib/planning/types";
 import type { RetrievedContext } from "@/lib/knowledge/types";
 import { haversineKm } from "@/lib/planning/geo";
+import { accommodationFromNightly } from "@/lib/planning/nightly-budget";
 
 export function validateAgentOutput(
   plan: Omit<TripPlan, "id" | "createdAt">,
@@ -137,12 +138,19 @@ function validateBudget(
     plan.budgetBreakdown.transportation +
     plan.budgetBreakdown.other;
 
-  if (context.budgetAmount && total > context.budgetAmount * 1.2) {
-    issues.push({
-      code: "budget_exceeded",
-      message: `Budget breakdown ($${total}) exceeds user budget ($${context.budgetAmount}) by more than 20%.`,
-      severity: "warning",
-    });
+  if (context.budgetAmount) {
+    const stay = accommodationFromNightly(
+      context.budgetAmount,
+      plan.duration || context.tripLength || 5,
+      context.travelers
+    );
+    if (Math.abs(plan.budgetBreakdown.accommodation - stay.amount) > 1) {
+      issues.push({
+        code: "stay_budget_mismatch",
+        message: `Accommodation ($${plan.budgetBreakdown.accommodation}) does not match $${stay.nightly}/night × ${stay.nights} nights.`,
+        severity: "warning",
+      });
+    }
   }
 
   if (plan.estimatedBudget && Math.abs(total - plan.estimatedBudget) > plan.estimatedBudget * 0.3) {

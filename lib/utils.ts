@@ -1,5 +1,8 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { parseNightlyBudget } from "@/lib/planning/nightly-budget";
+
+export { parseNightlyBudget, nightlyStayLabel } from "@/lib/planning/nightly-budget";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,15 +21,7 @@ export function generateId(): string {
 }
 
 export function parseBudgetRange(budget: string, customBudget?: number): number {
-  if (budget === "custom" && customBudget) return customBudget;
-  const map: Record<string, number> = {
-    "<$500": 450,
-    "$500–$1,000": 750,
-    "$1,000–$2,000": 1500,
-    "$2,000–$4,000": 3000,
-    "$4,000+": 5000,
-  };
-  return map[budget] ?? 1500;
+  return parseNightlyBudget(budget, customBudget);
 }
 
 export function calculateDuration(startDate?: string, endDate?: string, flexible?: boolean): number {

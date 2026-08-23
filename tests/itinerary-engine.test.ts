@@ -32,7 +32,7 @@ function profile(partial: Partial<TripPlannerInput>): ReturnType<typeof buildTri
     destinationLatitude: 35.2271,
     destinationLongitude: -80.8431,
     flexibleDates: true,
-    budget: "$1,000–$2,000",
+    budget: "$150–$250/night",
     travelers: "Couple",
     interests: ["Food"],
     travelStyle: "Comfortable",
@@ -58,8 +58,8 @@ async function runTests() {
 
   console.log("Trip profiles:");
   const cases: Array<[string, Partial<TripPlannerInput>]> = [
-    ["Budget traveler", { travelStyle: "Budget", budget: "<$500", interests: ["Food", "Local experiences"] }],
-    ["Luxury traveler", { travelStyle: "Luxury", budget: "$4,000+", interests: ["Food", "Culture"] }],
+    ["Budget traveler", { travelStyle: "Budget", budget: "Under $80/night", interests: ["Food", "Local experiences"] }],
+    ["Luxury traveler", { travelStyle: "Luxury", budget: "$400+/night", interests: ["Food", "Culture"] }],
     ["History-focused", { interests: ["History", "Architecture"], travelers: "Couple" }],
     ["Food-focused", { interests: ["Food", "Local experiences"], additionalNotes: "Vegetarian" }],
     ["Nightlife-focused", { interests: ["Nightlife", "Food"], travelers: "Friends" }],
@@ -573,7 +573,7 @@ async function runTests() {
     destination: "Charlotte",
     destinationUnknown: false,
     flexibleDates: true,
-    budget: "$1,000–$2,000",
+    budget: "$150–$250/night",
     travelers: "Couple",
     interests: ["History"],
     travelStyle: "Comfortable",
@@ -584,7 +584,7 @@ async function runTests() {
     destination: "Charlotte",
     destinationUnknown: false,
     flexibleDates: true,
-    budget: "$1,000–$2,000",
+    budget: "$150–$250/night",
     travelers: "Couple",
     interests: ["History"],
     travelStyle: "Comfortable",
@@ -605,6 +605,32 @@ async function runTests() {
   assert(couple.reqs.some((item) => item.id === "culture-arts"), "culture traveler searches galleries/theaters");
   assert(deriveProviderTags({ type: "museum", reviewCount: 20 }).includes("cultural"), "museums get cultural provider tags");
   assert(deriveProviderTags({ type: "attraction", reviewCount: 5000 }).includes("popular"), "high review count is tagged popular");
+
+  console.log("\nNightly stay budget:");
+  const { parseNightlyBudget, accommodationFromNightly, nightlyStayLabel } = await import("../lib/planning/nightly-budget");
+  assert(parseNightlyBudget("$150–$250/night") === 200, "mid band is $200 a night");
+  assert(nightlyStayLabel("$150–$250/night") === "$150–$250/night", "hotel cards use the selected nightly label");
+  const coupleStay = accommodationFromNightly(200, 5, "Couple");
+  assert(coupleStay.nights === 4 && coupleStay.rooms === 1 && coupleStay.amount === 800, "5-day couple stay is $200 × 4 nights");
+  const friendsStay = accommodationFromNightly(200, 5, "Friends");
+  assert(friendsStay.rooms === 2 && friendsStay.amount === 1600, "friends stay uses two rooms at the same nightly rate");
+  const nightlyEstimate = estimateTripBudget(
+    {
+      destination: "Charlotte",
+      tripLength: 5,
+      travelers: "Couple",
+      interests: ["food"],
+      budget: "premium",
+      budgetAmount: 200,
+      mode: "specific_destination",
+      dislikes: [],
+      clarifyingQuestions: [],
+      fieldStates: {},
+    },
+    null
+  );
+  assert(nightlyEstimate.accommodation.amount === 800, "trip estimate accommodation matches nightly × nights");
+  assert(nightlyEstimate.total > nightlyEstimate.accommodation.amount, "trip total is stay plus the rest of the trip");
 
   console.log(`\n=== RESULTS: ${passed} passed, ${failed} failed ===\n`);
   process.exit(failed > 0 ? 1 : 0);

@@ -92,7 +92,7 @@ export function formatTripProfileLog(profile: TripProfile): string {
       : "",
     `  duration: ${profile.tripLength} days`,
     `  travelers: ${profile.travelers} (${profile.travelerCount})`,
-    `  budget: ${profile.budgetLevel} (${profile.budgetLabel})`,
+    `  stay budget: ${profile.budgetLabel} · ${profile.budgetLevel}`,
     `  style: ${profile.travelStyle}`,
     `  pace: ${profile.pace} (${profile.preferredStartHour}:00–${profile.preferredEndHour}:00)`,
     `  walking: ${profile.walkingTolerance}`,

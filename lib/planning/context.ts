@@ -1,6 +1,7 @@
 import type { TripPlannerInput } from "@/types/trip";
 import type { TravelStyle, BudgetLevel } from "@/lib/knowledge/types";
 import { mapInterestToTravelStyle, mapBudgetToLevel } from "@/lib/knowledge/taxonomy";
+import { parseNightlyBudget } from "./nightly-budget";
 import type { EnhancedTripPlanningContext, FieldState, PlanningMode } from "./types";
 import type { TripPlan } from "@/types/trip";
 
@@ -164,8 +165,11 @@ export function buildEnhancedPlanningContext(
     prior?.destination ??
     (input.destinationUnknown ? undefined : input.destination || options?.existingPlan?.destination);
 
-  const budget = input.budget ? mapBudgetToLevel(input.budget) : prior?.budget;
-  const budgetAmount = input.customBudget ?? prior?.budgetAmount;
+  const nightly = input.budget
+    ? parseNightlyBudget(input.budget, input.customBudget)
+    : prior?.budgetAmount;
+  const budget = nightly != null ? mapBudgetToLevel(input.budget || "", nightly) : prior?.budget;
+  const budgetAmount = nightly ?? prior?.budgetAmount;
 
   const mode = inferPlanningMode(input, options?.userMessage, options?.existingPlan);
 
@@ -245,20 +249,20 @@ function buildClarifyingQuestions(params: {
   }
 
   if (params.destinationUnknown && !params.budget && !params.budgetAmount) {
-    questions.push("What's your approximate total budget for the trip?");
+    questions.push("What nightly stay budget are you aiming for?");
   }
 
   if (params.destination && !params.dates && !params.tripLength) {
     questions.push(`What month or dates are you thinking for ${params.destination}?`);
   }
 
-  if (params.budgetAmount && params.budgetAmount < 800) {
+  if (params.budgetAmount && params.budgetAmount < 100) {
     const wantsLuxury =
       params.budget === "luxury" ||
       (params as { travelStyle?: string }).travelStyle === "Luxury";
     if (wantsLuxury) {
       questions.push(
-        "Your budget is quite tight for a luxury style — should I optimize for value while keeping comfort where it matters?"
+        "A luxury stay is hard to hold under $100 a night — should I keep comfort where it matters and look for value hotels?"
       );
     }
   }

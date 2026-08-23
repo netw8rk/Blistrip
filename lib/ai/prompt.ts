@@ -86,7 +86,7 @@ HARD RULES:
 2. Copy name and providerPlaceId exactly. Never invent a name, address, or coordinate.
 3. If the pool is missing a category, omit it rather than fabricating.
 4. Do not claim live prices, reviews, or availability unless they were supplied with the place.
-5. Budget is a planning constraint, not a price quote.
+5. Stay budget is a nightly room rate. Hotel priceRange and accommodation must match that nightly rate × nights. Do not treat it as a total trip budget.
 6. Keep each day walkable. Do not bounce across the city.
 7. Slow pace = fewer stops. Packed pace = more stops from the pool.
 8. Traveler-facing copy (tripSummary, whyRecommended, travelTips, descriptions) must never mention OpenStreetMap, OSM, Google Places, data providers, “verified listings,” or how the itinerary was built. Write like a travel guide.

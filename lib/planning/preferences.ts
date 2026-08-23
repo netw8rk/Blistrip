@@ -1,5 +1,5 @@
 import type { TripPlannerInput } from "@/types/trip";
-import { parseBudgetRange } from "@/lib/utils";
+import { nightlyStayLabel, nightlyToPrefLevel, parseNightlyBudget } from "./nightly-budget";
 import { parseRegionFromLabel } from "./confirmed-destination";
 import { slotBudgets } from "./slot-fit";
 
@@ -92,8 +92,8 @@ export function buildUserPreferences(
   const pace = PACE_MAP[input.pace] ?? "balanced";
   const localVsTouristy = deriveLocalPreference(selected, notes, input.travelStyle);
   const walkingTolerance = deriveWalkingTolerance(pace, notes, input.travelStyle);
-  const budgetAmount = parseBudgetRange(input.budget, input.customBudget);
-  const budgetLevel = budgetAmount < 800 ? "low" : budgetAmount < 2500 ? "moderate" : "high";
+  const budgetAmount = parseNightlyBudget(input.budget, input.customBudget);
+  const budgetLevel = nightlyToPrefLevel(budgetAmount);
 
   const dietary = parseDietary(notes);
   const cuisineHints = parseCuisineHints(notes, dietary);
@@ -122,7 +122,7 @@ export function buildUserPreferences(
     tripLength: tripLength || 5,
     flexibleDates: input.flexibleDates,
     budgetLevel,
-    budgetLabel: input.budget,
+    budgetLabel: nightlyStayLabel(input.budget, input.customBudget),
     budgetAmount,
     travelers: input.travelers,
     travelStyle: input.travelStyle,
@@ -229,7 +229,7 @@ export function formatPreferencesLog(prefs: UserTripPreferences): string {
       ? `  coordinates: ${prefs.latitude.toFixed(4)}, ${prefs.longitude.toFixed(4)}`
       : "",
     `  duration: ${prefs.tripLength} days`,
-    `  budget: ${prefs.budgetLevel} (${prefs.budgetLabel})`,
+    `  stay budget: ${prefs.budgetLabel} · ${prefs.budgetLevel}`,
     `  party: ${prefs.travelers}`,
     `  style: ${prefs.travelStyle}`,
     `  pace: ${prefs.pace}`,

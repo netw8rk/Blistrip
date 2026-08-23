@@ -17,7 +17,7 @@ import { Check } from "lucide-react";
 export default function ProfileClient() {
   const [prefs, setPrefs] = useState<UserPreferences>({
     travelStyle: "Comfortable",
-    budgetPreference: "$1,000–$2,000",
+    budgetPreference: "$150–$250/night",
     favoriteActivities: [],
     preferredPace: "Balanced",
   });
@@ -74,7 +74,7 @@ export default function ProfileClient() {
         </section>
 
         <section>
-          <h2 className="font-semibold mb-3">Budget Preference</h2>
+          <h2 className="font-semibold mb-3">Nightly stay budget</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {BUDGET_OPTIONS.map((opt) => (
               <button

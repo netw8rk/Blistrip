@@ -27,6 +27,7 @@ import { GooglePlacesProvider, isExcludedGoogleTypes } from "./providers/google-
 import { cityHeroQueries, pickCityHeroPhoto } from "./city-hero-photo";
 import type { BudgetEstimate, PlannedActivity, StructuredItineraryDraft } from "@/lib/planning/types";
 import { draftToDailyItinerary } from "@/lib/planning/merge";
+import { accommodationFromNightly, googleHotelMaxPriceLevel } from "@/lib/planning/nightly-budget";
 import { OpenStreetMapProvider, type OsmCategoryQuery } from "./providers/openstreetmap";
 
 export interface RankedPlace {
@@ -557,6 +558,15 @@ export function scorePlace(place: NormalizedPlace, prefs: UserTripPreferences): 
   if (prefs.budgetLevel === "high" && (type === "hotel" || type === "restaurant")) {
     add(6, "fits higher-budget trip");
   }
+  if (type === "hotel" || type === "hostel") {
+    const target = googleHotelMaxPriceLevel(prefs.budgetAmount) ?? 4;
+    if (place.priceLevel != null && place.priceLevel <= target) {
+      add(SCORING_WEIGHTS.budgetFit, "fits nightly stay budget");
+    } else if (place.priceLevel != null && place.priceLevel > target) {
+      score -= 10;
+      reasons.push("above selected nightly stay budget");
+    }
+  }
 
   const quality = reviewConfidenceScore(place.rating, place.reviewCount);
   if (quality > 0) {
@@ -772,6 +782,7 @@ async function searchGoogleRequirements(
         radiusMeters: 30000,
         limit: 20,
         minRating: requirement.minRating,
+        maxPriceLevel: requirement.id === "hotels" ? googleHotelMaxPriceLevel(prefs.budgetAmount) : undefined,
       });
       let places = first.places;
       if (requirement.priority >= 8 && first.nextPageToken) {
@@ -785,6 +796,7 @@ async function searchGoogleRequirements(
           radiusMeters: 30000,
           limit: 20,
           minRating: requirement.minRating,
+          maxPriceLevel: requirement.id === "hotels" ? googleHotelMaxPriceLevel(prefs.budgetAmount) : undefined,
           pageToken: first.nextPageToken,
         });
         places = [...places, ...next.places];
@@ -1460,7 +1472,11 @@ export function constrainItineraryToPool(
     const existing = plan.hotelRecommendations.find(
       (h) => h.name.toLowerCase() === item.place.name.toLowerCase()
     );
-    return toHotelRecommendation(item.place as import("./types").NormalizedHotel, existing?.whyRecommended);
+    return toHotelRecommendation(
+      item.place as import("./types").NormalizedHotel,
+      existing?.whyRecommended,
+      prefs.budgetLabel
+    );
   });
 
   const dining = retrieval.diningAndNightlife.slice(0, 12);
@@ -1544,8 +1560,13 @@ export function buildPlanFromRetrieval(
     [...retrieval.selected, ...retrieval.hotels, ...retrieval.restaurants].map((r) => r.place),
     retrieval.city
   );
+  const stay = accommodationFromNightly(prefs.budgetAmount, prefs.tripLength, prefs.travelers);
   const hotelRecs = retrieval.hotels.slice(0, 3).map((item) =>
-    toHotelRecommendation(item.place as import("./types").NormalizedHotel, item.reasons[0])
+    toHotelRecommendation(
+      item.place as import("./types").NormalizedHotel,
+      item.reasons[0],
+      prefs.budgetLabel
+    )
   );
   const restaurantRecs = retrieval.diningAndNightlife.slice(0, 12).map((item, index) =>
     toRestaurantRecommendation(item.place, index, item.reasons[0])
@@ -1565,6 +1586,9 @@ export function buildPlanFromRetrieval(
     dates: prefs.dates ? `${prefs.dates.start} – ${prefs.dates.end}` : "Flexible dates",
     duration: prefs.tripLength,
     estimatedBudget: budget.total,
+    nightlyStayBudget: stay.nightly,
+    stayNights: stay.nights,
+    stayRooms: stay.rooms,
     travelStyle: prefs.travelStyle,
     interests: prefs.selectedInterests,
     recommendedNeighborhood: neighborhoods[0]?.name ?? prefs.destination,

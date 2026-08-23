@@ -2,11 +2,40 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Backpack,
+  Building2,
+  CalendarDays,
+  Check,
+  Compass,
+  Gem,
+  Heart,
+  Landmark,
+  Layers,
+  Loader2,
+  MapPinned,
+  Mountain,
+  Palette,
+  Palmtree,
+  ShoppingBag,
+  Sparkles,
+  Trees,
+  Trophy,
+  User,
+  Users,
+  UsersRound,
+  UtensilsCrossed,
+  Wallet,
+  Waves,
+  Wine,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
 import { setActiveTrip } from "@/lib/storage";
@@ -23,6 +52,17 @@ import type { DestinationSuggestion } from "@/lib/travel/suggest-places";
 
 const TOTAL_STEPS = 8;
 
+const STEP_META = [
+  { label: "Place", title: "Where are you going?", subtitle: "Pick a city from the list so we search the right place." },
+  { label: "Dates", title: "When are you going?", subtitle: "Set your dates, or keep them open." },
+  { label: "Budget", title: "What's your nightly stay budget?", subtitle: "How much do you want to spend on a room each night." },
+  { label: "Who", title: "Who's coming with you?", subtitle: "We'll shape the plan around the group." },
+  { label: "Vibe", title: "What kind of trip?", subtitle: "Select everything you want in the days." },
+  { label: "Style", title: "How do you like to travel?", subtitle: "This sets the tone for stays and spend." },
+  { label: "Pace", title: "How full should each day feel?", subtitle: "We'll keep the itinerary in that range." },
+  { label: "Notes", title: "Anything else we should know?", subtitle: "Diet, accessibility, must-sees — optional." },
+] as const;
+
 const LOADING_MESSAGES = [
   "Understanding your travel style...",
   "Finding the right neighborhoods...",
@@ -31,6 +71,42 @@ const LOADING_MESSAGES = [
   "Putting your trip together...",
 ];
 
+const TRAVELER_META: Record<string, { icon: LucideIcon; hint: string }> = {
+  Solo: { icon: User, hint: "Just you" },
+  Couple: { icon: Heart, hint: "Two of you" },
+  Friends: { icon: Users, hint: "A group trip" },
+  Family: { icon: UsersRound, hint: "Kids or relatives" },
+};
+
+const INTEREST_META: Record<string, LucideIcon> = {
+  Nightlife: Wine,
+  History: Landmark,
+  Food: UtensilsCrossed,
+  Culture: Palette,
+  Nature: Trees,
+  Beaches: Palmtree,
+  Adventure: Mountain,
+  Relaxation: Waves,
+  Shopping: ShoppingBag,
+  Sports: Trophy,
+  Architecture: Building2,
+  "Local experiences": MapPinned,
+};
+
+const STYLE_META: Record<string, { icon: LucideIcon; hint: string }> = {
+  Budget: { icon: Wallet, hint: "Value stays and local eats" },
+  Comfortable: { icon: Sparkles, hint: "Nice hotels, balanced spend" },
+  Luxury: { icon: Gem, hint: "Top stays and experiences" },
+  Backpacker: { icon: Backpack, hint: "Hostels and cheap eats" },
+  "Mix of everything": { icon: Layers, hint: "A bit of each" },
+};
+
+const PACE_META: Record<string, { icon: LucideIcon; hint: string }> = {
+  "Slow and relaxed": { icon: Waves, hint: "Fewer stops, more time" },
+  Balanced: { icon: CalendarDays, hint: "A full day without rushing" },
+  "Pack everything in": { icon: Zap, hint: "See as much as you can" },
+};
+
 const initialInput: TripPlannerInput = {
   destination: "",
   destinationUnknown: false,
@@ -38,7 +114,7 @@ const initialInput: TripPlannerInput = {
   startDate: "",
   endDate: "",
   flexibleDates: false,
-  budget: "$1,000–$2,000",
+  budget: "$150–$250/night",
   travelers: "Couple",
   interests: [],
   travelStyle: "Comfortable",
@@ -46,27 +122,64 @@ const initialInput: TripPlannerInput = {
   additionalNotes: "",
 };
 
-interface OptionButtonProps {
+function OptionCard({
+  selected,
+  onClick,
+  icon: Icon,
+  label,
+  hint,
+  compact,
+  className,
+}: {
   selected: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  icon?: LucideIcon;
+  label: string;
+  hint?: string;
+  compact?: boolean;
   className?: string;
-}
-
-function OptionButton({ selected, onClick, children, className }: OptionButtonProps) {
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={selected}
       className={cn(
-        "rounded-xl border px-4 py-3 text-sm font-medium text-left transition-all duration-200",
+        "group relative flex w-full text-left transition-all duration-200 rounded-xl border",
+        compact ? "items-center gap-2.5 px-3 py-2.5" : "items-start gap-3 px-3.5 py-3",
         selected
-          ? "border-border-accent bg-primary-muted text-primary"
-          : "border-border bg-surface-elevated hover:border-border-accent hover:bg-surface-hover text-foreground-secondary",
+          ? "border-border-accent bg-primary-muted shadow-[0_0_0_1px_rgba(169,149,214,0.2)]"
+          : "border-border/70 bg-background/60 hover:border-border hover:bg-surface/80",
         className
       )}
     >
-      {children}
+      {Icon ? (
+        <span
+          className={cn(
+            "flex shrink-0 items-center justify-center rounded-lg border transition-colors",
+            compact ? "h-7 w-7" : "mt-0.5 h-8 w-8",
+            selected
+              ? "border-border-accent bg-background/70 text-primary"
+              : "border-border/60 bg-background/50 text-muted group-hover:text-foreground-secondary"
+          )}
+        >
+          <Icon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+        </span>
+      ) : null}
+      <span className="min-w-0 flex-1">
+        <span className={cn("block text-sm font-medium leading-snug", selected ? "text-foreground" : "text-foreground-secondary")}>
+          {label}
+        </span>
+        {hint ? <span className="mt-0.5 block text-xs text-muted leading-snug">{hint}</span> : null}
+      </span>
+      {!compact ? (
+        <Check
+          className={cn(
+            "mt-1 h-4 w-4 shrink-0 transition-opacity",
+            selected ? "text-primary opacity-100" : "opacity-0"
+          )}
+        />
+      ) : null}
     </button>
   );
 }
@@ -129,6 +242,7 @@ export function TripPlanner() {
         ? prev.interests.filter((i) => i !== interest)
         : [...prev.interests, interest],
     }));
+    setError("");
   };
 
   const canProceed = (): boolean => {
@@ -230,42 +344,84 @@ export function TripPlanner() {
     }
   };
 
-  const progress = (step / TOTAL_STEPS) * 100;
+  const current = STEP_META[step - 1];
+  const summaryChips = buildSummaryChips(input, {
+    destinationSelected,
+    customBudgetMode,
+    upToStep: step,
+  });
 
   if (loading) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4">
-        <div className="w-full max-w-md text-center animate-fade-in">
-          <div className="mb-8 flex justify-center">
-            <div className="relative">
-              <div className="h-16 w-16 rounded-full border-2 border-border" />
-              <Loader2 className="absolute inset-0 m-auto h-8 w-8 text-primary animate-spin" />
-            </div>
+      <PlannerShell>
+        <div className="flex min-h-[28rem] flex-col items-center justify-center px-6 py-16 text-center">
+          <div className="relative mb-8">
+            <div className="h-16 w-16 rounded-full border border-border bg-background/70" />
+            <Loader2 className="absolute inset-0 m-auto h-7 w-7 text-primary animate-spin" />
           </div>
-          <p className="eyebrow mb-3">Building Your Trip</p>
-          <p className="text-xl font-semibold mb-2 animate-pulse-soft">{loadingMessage}</p>
-          <p className="text-sm text-muted">This usually takes a few seconds</p>
+          <p className="eyebrow mb-3">Building your trip</p>
+          <p className="text-xl font-semibold tracking-tight animate-pulse-soft">{loadingMessage}</p>
+          <p className="mt-2 text-sm text-muted">This usually takes a few seconds</p>
         </div>
-      </div>
+      </PlannerShell>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:py-16">
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-3">
-          <p className="eyebrow">Trip Planner</p>
-          <p className="text-sm text-muted font-medium">{step}/{TOTAL_STEPS}</p>
+    <PlannerShell>
+      <div className="border-b border-border/70 px-5 py-5 sm:px-8 lg:px-10">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="eyebrow">Plan a trip</p>
+          <p className="text-xs font-medium tabular-nums text-muted">
+            {step} / {TOTAL_STEPS}
+          </p>
         </div>
-        <Progress value={progress} />
+        <ol className="flex items-center gap-1.5" aria-label="Planner progress">
+          {STEP_META.map((item, index) => {
+            const complete = index + 1 < step;
+            const active = index + 1 === step;
+            return (
+              <li key={item.label} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+                <span
+                  className={cn(
+                    "h-1 w-full rounded-full transition-colors duration-300",
+                    complete || active ? "bg-primary" : "bg-surface-hover"
+                  )}
+                />
+                <span
+                  className={cn(
+                    "hidden text-[10px] font-medium tracking-[0.06em] uppercase sm:block",
+                    active ? "text-primary" : complete ? "text-foreground-secondary" : "text-muted"
+                  )}
+                >
+                  {item.label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        {summaryChips.length > 0 ? (
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {summaryChips.map((chip) => (
+              <span
+                key={chip}
+                className="inline-flex items-center rounded-full border border-border/70 bg-background/60 px-2.5 py-1 text-[11px] font-medium text-foreground-secondary"
+              >
+                {chip}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <div key={step} className="animate-slide-up">
+      <div key={step} className="animate-slide-up px-5 py-7 sm:px-8 sm:py-9 lg:px-10">
+        <h2 className="text-2xl font-semibold tracking-tight leading-[1.15] sm:text-[1.75rem]">{current.title}</h2>
+        <p className="mt-2 mb-8 max-w-2xl text-sm leading-relaxed text-foreground-secondary sm:text-[15px]">
+          {current.subtitle}
+        </p>
+
         {step === 1 && (
-          <StepWrapper
-            title="Where are you going?"
-            subtitle="Type a city, then pick the matching place from the list so we search the right location."
-          >
+          <div className="space-y-4">
             {!input.destinationUnknown ? (
               <>
                 <DestinationPicker
@@ -313,224 +469,283 @@ export function TripPlanner() {
                     }));
                     setError("");
                   }}
-                  className="text-sm text-primary hover:text-primary-hover transition-colors mt-2"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-hover transition-colors"
                 >
+                  <Compass className="h-3.5 w-3.5" />
                   I don&apos;t know yet — help me decide
                 </button>
               </>
             ) : (
               <>
                 <Textarea
-                  placeholder="I want somewhere affordable in Europe with nightlife and good food..."
+                  placeholder="Somewhere affordable in Europe with nightlife and good food..."
                   value={input.destinationDescription}
                   onChange={(e) => update("destinationDescription", e.target.value)}
-                  className="min-h-[100px]"
+                  className="min-h-[120px]"
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={() => update("destinationUnknown", false)}
-                  className="text-sm text-primary hover:text-primary-hover transition-colors mt-2"
+                  className="text-sm font-medium text-primary hover:text-primary-hover transition-colors"
                 >
                   I know where I want to go
                 </button>
               </>
             )}
-          </StepWrapper>
+          </div>
         )}
 
         {step === 2 && (
-          <StepWrapper title="When are you going?" subtitle="Select your travel dates or mark as flexible.">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-muted mb-1.5 block">Start date</label>
-                <Input
-                  type="date"
-                  value={input.startDate}
-                  onChange={(e) => update("startDate", e.target.value)}
-                  disabled={input.flexibleDates}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted mb-1.5 block">End date</label>
-                <Input
-                  type="date"
-                  value={input.endDate}
-                  onChange={(e) => update("endDate", e.target.value)}
-                  disabled={input.flexibleDates}
-                />
-              </div>
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <DateField
+                label="Start"
+                value={input.startDate}
+                onChange={(value) => update("startDate", value)}
+                disabled={input.flexibleDates}
+              />
+              <DateField
+                label="End"
+                value={input.endDate}
+                min={input.startDate}
+                onChange={(value) => update("endDate", value)}
+                disabled={input.flexibleDates}
+              />
             </div>
-            <OptionButton
+            <OptionCard
               selected={input.flexibleDates}
               onClick={() => update("flexibleDates", !input.flexibleDates)}
-              className="mt-2 w-full text-center"
-            >
-              I&apos;m flexible on dates
-            </OptionButton>
-          </StepWrapper>
+              icon={CalendarDays}
+              label="I'm flexible on dates"
+              hint="We'll plan around a typical trip length"
+            />
+          </div>
         )}
 
         {step === 3 && (
-          <StepWrapper title="What's your budget?" subtitle="Total trip budget including flights, accommodation, and activities.">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {BUDGET_OPTIONS.map((opt) => (
-                <OptionButton
+                <OptionCard
                   key={opt}
                   selected={!customBudgetMode && input.budget === opt}
-                  onClick={() => { setCustomBudgetMode(false); update("budget", opt); }}
-                >
-                  {opt}
-                </OptionButton>
+                  onClick={() => {
+                    setCustomBudgetMode(false);
+                    update("budget", opt);
+                  }}
+                  label={opt}
+                  compact
+                  className="justify-center py-3.5 [&>span]:flex-none"
+                />
               ))}
             </div>
-            <OptionButton
+            <OptionCard
               selected={customBudgetMode}
               onClick={() => setCustomBudgetMode(true)}
-              className="w-full text-center"
-            >
-              Custom budget
-            </OptionButton>
+              icon={Wallet}
+              label="Custom nightly rate"
+              hint="Enter a price per night in USD"
+            />
             {customBudgetMode && (
-              <div className="mt-3">
-                <label className="text-xs text-muted mb-1.5 block">Your budget (USD)</label>
+              <div className="rounded-xl border border-border/70 bg-background/50 px-3.5 py-3">
+                <label className="mb-1.5 block text-xs font-medium text-muted">Price per night (USD)</label>
                 <Input
                   type="number"
                   placeholder="e.g. 1500"
                   value={input.customBudget ?? ""}
                   onChange={(e) => update("customBudget", parseInt(e.target.value) || undefined)}
+                  autoFocus
                 />
               </div>
             )}
-          </StepWrapper>
+          </div>
         )}
 
         {step === 4 && (
-          <StepWrapper title="Who are you traveling with?" subtitle="This helps us tailor recommendations.">
-            <div className="grid grid-cols-2 gap-3">
-              {TRAVELER_OPTIONS.map((opt) => (
-                <OptionButton
-                  key={opt}
-                  selected={input.travelers === opt}
-                  onClick={() => update("travelers", opt)}
-                >
-                  {opt}
-                </OptionButton>
-              ))}
-            </div>
-          </StepWrapper>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {TRAVELER_OPTIONS.map((opt) => (
+              <OptionCard
+                key={opt}
+                selected={input.travelers === opt}
+                onClick={() => update("travelers", opt)}
+                icon={TRAVELER_META[opt].icon}
+                label={opt}
+                hint={TRAVELER_META[opt].hint}
+              />
+            ))}
+          </div>
         )}
 
         {step === 5 && (
-          <StepWrapper title="What kind of trip do you want?" subtitle="Select all that apply.">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {INTEREST_OPTIONS.map((opt) => (
-                <OptionButton
-                  key={opt}
-                  selected={input.interests.includes(opt)}
-                  onClick={() => toggleInterest(opt)}
-                >
-                  {opt}
-                </OptionButton>
-              ))}
-            </div>
-          </StepWrapper>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            {INTEREST_OPTIONS.map((opt) => (
+              <OptionCard
+                key={opt}
+                selected={input.interests.includes(opt)}
+                onClick={() => toggleInterest(opt)}
+                icon={INTEREST_META[opt]}
+                label={opt}
+                compact
+              />
+            ))}
+          </div>
         )}
 
         {step === 6 && (
-          <StepWrapper title="What's your travel style?" subtitle="How do you like to travel?">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {TRAVEL_STYLE_OPTIONS.map((opt) => (
-                <OptionButton
-                  key={opt}
-                  selected={input.travelStyle === opt}
-                  onClick={() => update("travelStyle", opt)}
-                >
-                  {opt}
-                </OptionButton>
-              ))}
-            </div>
-          </StepWrapper>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            {TRAVEL_STYLE_OPTIONS.map((opt) => (
+              <OptionCard
+                key={opt}
+                selected={input.travelStyle === opt}
+                onClick={() => update("travelStyle", opt)}
+                icon={STYLE_META[opt].icon}
+                label={opt}
+                hint={STYLE_META[opt].hint}
+              />
+            ))}
+          </div>
         )}
 
         {step === 7 && (
-          <StepWrapper title="How do you like to travel?" subtitle="Your preferred pace for each day.">
-            <div className="grid grid-cols-1 gap-3">
-              {PACE_OPTIONS.map((opt) => (
-                <OptionButton
-                  key={opt}
-                  selected={input.pace === opt}
-                  onClick={() => update("pace", opt)}
-                >
-                  {opt}
-                </OptionButton>
-              ))}
-            </div>
-          </StepWrapper>
+          <div className="grid grid-cols-1 gap-2.5">
+            {PACE_OPTIONS.map((opt) => (
+              <OptionCard
+                key={opt}
+                selected={input.pace === opt}
+                onClick={() => update("pace", opt)}
+                icon={PACE_META[opt].icon}
+                label={opt}
+                hint={PACE_META[opt].hint}
+              />
+            ))}
+          </div>
         )}
 
         {step === 8 && (
-          <StepWrapper
-            title="Anything else we should know?"
-            subtitle="Special requests, dietary needs, accessibility, or anything that helps us personalize your plan."
-          >
-            <Textarea
-              placeholder="Traveling with two friends. We're 25 and want nightlife but also want to see the historical parts of the city. We don't want to spend more than $120/night."
-              value={input.additionalNotes}
-              onChange={(e) => update("additionalNotes", e.target.value)}
-              className="min-h-[140px]"
-            />
-          </StepWrapper>
+          <Textarea
+            placeholder="Traveling with two friends. We want nightlife and the historic parts of the city, and we'd rather not spend more than $120 a night."
+            value={input.additionalNotes}
+            onChange={(e) => update("additionalNotes", e.target.value)}
+            className="min-h-[148px]"
+          />
         )}
       </div>
 
       {error && (
-        <p className="mt-4 text-sm text-red-400 bg-red-950/40 border border-red-900/50 rounded-lg px-4 py-3">
+        <p className="mx-5 mb-1 rounded-xl border border-red-900/40 bg-red-950/10 px-4 py-3 text-sm text-red-700 sm:mx-8 lg:mx-10">
           {error}
         </p>
       )}
 
-      <div className="mt-8 flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-3 border-t border-border/70 px-5 py-4 sm:px-8 lg:px-10">
         <Button
           variant="ghost"
           onClick={handleBack}
           disabled={step === 1}
-          className={step === 1 ? "invisible" : ""}
+          className={cn("px-3", step === 1 && "invisible")}
         >
           <ArrowLeft className="h-4 w-4" />
           Back
         </Button>
 
         {step < TOTAL_STEPS ? (
-          <Button onClick={handleNext}>
+          <Button onClick={handleNext} className="min-w-[8.5rem]">
             Next
             <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={handleSubmit}>
-            Build My Trip
+          <Button onClick={handleSubmit} className="min-w-[8.5rem]">
+            Build my trip
             <ArrowRight className="h-4 w-4" />
           </Button>
         )}
       </div>
+    </PlannerShell>
+  );
+}
+
+function PlannerShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-4 h-56 w-[36rem] -translate-x-1/2 rounded-full bg-primary-glow blur-3xl"
+      />
+      <div className="hero-glass relative overflow-hidden shadow-sm">{children}</div>
     </div>
   );
 }
 
-function StepWrapper({
-  title,
-  subtitle,
-  children,
+function DateField({
+  label,
+  value,
+  min,
+  disabled,
+  onChange,
 }: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
+  label: string;
+  value?: string;
+  min?: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
 }) {
   return (
-    <div>
-      <h2 className="text-2xl sm:text-3xl font-bold mb-2">{title}</h2>
-      <p className="text-foreground-secondary mb-8">{subtitle}</p>
-      <div className="space-y-3">{children}</div>
-    </div>
+    <label
+      className={cn(
+        "block rounded-xl border px-3.5 py-3 transition-colors",
+        disabled ? "border-border/50 bg-surface/40 opacity-60" : "border-border/70 bg-background/60"
+      )}
+    >
+      <span className="mb-1.5 block text-xs font-medium text-muted">{label}</span>
+      <Input
+        type="date"
+        value={value}
+        min={min}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="h-10 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+      />
+    </label>
   );
+}
+
+function buildSummaryChips(
+  input: TripPlannerInput,
+  options: { destinationSelected: boolean; customBudgetMode: boolean; upToStep: number }
+): string[] {
+  const chips: string[] = [];
+  if (options.upToStep > 1) {
+    if (input.destinationUnknown && input.destinationDescription?.trim()) chips.push("Help me decide");
+    else if (options.destinationSelected) chips.push(input.destination);
+  }
+  if (options.upToStep > 2) {
+    chips.push(
+      input.flexibleDates
+        ? "Flexible dates"
+        : input.startDate && input.endDate
+          ? `${formatChipDate(input.startDate)} – ${formatChipDate(input.endDate)}`
+          : ""
+    );
+  }
+  if (options.upToStep > 3) {
+    chips.push(
+      options.customBudgetMode && input.customBudget
+        ? `$${input.customBudget.toLocaleString()}/night`
+        : input.budget
+    );
+  }
+  if (options.upToStep > 4 && input.travelers) chips.push(input.travelers);
+  if (options.upToStep > 5 && input.interests.length) {
+    chips.push(input.interests.length === 1 ? input.interests[0] : `${input.interests.length} interests`);
+  }
+  if (options.upToStep > 6 && input.travelStyle) chips.push(input.travelStyle);
+  if (options.upToStep > 7 && input.pace) chips.push(input.pace);
+  return chips.filter(Boolean);
+}
+
+function formatChipDate(value: string): string {
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }

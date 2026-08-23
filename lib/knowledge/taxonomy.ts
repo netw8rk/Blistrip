@@ -54,11 +54,21 @@ export function mapInterestToTravelStyle(interest: string): TravelStyle | null {
   return mapping[interest.toLowerCase()] ?? null;
 }
 
-export function mapBudgetToLevel(budget: string): BudgetLevel {
-  if (budget.includes("<$500") || budget.includes("Budget")) return "budget";
-  if (budget.includes("$500") || budget.includes("$1,000")) return "moderate";
-  if (budget.includes("$2,000")) return "premium";
-  if (budget.includes("$4,000") || budget.includes("Luxury")) return "luxury";
+export function mapBudgetToLevel(budget: string, nightly?: number): BudgetLevel {
+  const amount = nightly ?? parseNightlyFromLabel(budget);
+  if (amount < 80 || budget.includes("Under $80") || budget.includes("<$500")) return "budget";
+  if (amount < 150 || budget.includes("$80–$150")) return "moderate";
+  if (amount < 250 || budget.includes("$150–$250") || budget.includes("$1,000–$2,000")) return "premium";
+  if (amount >= 250 || budget.includes("$400") || budget.includes("Luxury")) return "luxury";
   return "moderate";
+}
+
+function parseNightlyFromLabel(budget: string): number {
+  if (budget.includes("Under $80") || budget.includes("<$500")) return 65;
+  if (budget.includes("$80–$150") || budget.includes("$500–$1,000")) return 115;
+  if (budget.includes("$150–$250") || budget.includes("$1,000–$2,000")) return 200;
+  if (budget.includes("$250–$400") || budget.includes("$2,000–$4,000")) return 325;
+  if (budget.includes("$400") || budget.includes("$4,000")) return 500;
+  return 200;
 }
 

@@ -117,7 +117,13 @@ export function buildSearchRequirements(profile: SearchableProfile | TripProfile
   requirements.push({
     id: "hotels",
     category: "hotel",
-    query: `${profile.budgetLevel === "low" ? "hostels guesthouses" : "hotels"} in ${place}`,
+    query: `${
+      profile.budgetLevel === "low"
+        ? "budget hotels hostels guesthouses"
+        : profile.budgetLevel === "high"
+          ? "upscale hotels boutique hotels"
+          : "hotels"
+    } in ${place}`,
     placeType: "hotel",
     priority: 5,
     slot: "any",

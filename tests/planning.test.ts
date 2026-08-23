@@ -212,8 +212,8 @@ async function runTests() {
   const conflictInput: TripPlannerInput = {
     ...pragueInput,
     travelStyle: "Luxury",
-    customBudget: 500,
-    budget: "<$500",
+    customBudget: 70,
+    budget: "Under $80/night",
   };
   const ctx10 = buildEnhancedPlanningContext(conflictInput);
   assert(ctx10.clarifyingQuestions.length > 0, "Surfaces tradeoff clarifying question for conflicting prefs");

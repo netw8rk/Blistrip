@@ -140,7 +140,7 @@ function applyBudgetOptimization(
   tripPlan: TripPlan,
   context: EnhancedTripPlanningContext
 ): EditResult {
-  const target = context.budgetAmount ?? tripPlan.estimatedBudget * 0.85;
+    const target = tripPlan.estimatedBudget * 0.85;
   const { breakdown, savings, tradeoffs } = optimizeBudgetBreakdown(
     tripPlan.budgetBreakdown,
     target
@@ -261,7 +261,7 @@ function createFallbackInput(tripPlan: TripPlan): TripPlannerInput {
     destinationLongitude: tripPlan.destinationLongitude,
     destinationUnknown: false,
     flexibleDates: true,
-    budget: "$1,000–$2,000",
+    budget: "$150–$250/night",
     travelers: "Couple",
     interests: tripPlan.interests,
     travelStyle: tripPlan.travelStyle,

@@ -5,6 +5,7 @@ import type {
   ValidationIssue,
   ValidationResult,
 } from "./types";
+import { accommodationFromNightly } from "./nightly-budget";
 
 const PACE_MAX_ACTIVITIES: Record<string, number> = {
   slow: 8,
@@ -131,12 +132,19 @@ export function validateTripPlan(
     }
   }
 
-  if (context?.budgetAmount && plan.estimatedBudget > context.budgetAmount * 1.15) {
-    issues.push({
-      code: "budget_exceeded",
-      message: `Estimated budget ($${plan.estimatedBudget}) exceeds user's $${context.budgetAmount} limit.`,
-      severity: "warning",
-    });
+  if (context?.budgetAmount && plan.budgetBreakdown) {
+    const stay = accommodationFromNightly(
+      context.budgetAmount,
+      plan.duration || context.tripLength || 5,
+      context.travelers
+    );
+    if (Math.abs(plan.budgetBreakdown.accommodation - stay.amount) > 1) {
+      issues.push({
+        code: "stay_budget_mismatch",
+        message: `Accommodation ($${plan.budgetBreakdown.accommodation}) does not match $${stay.nightly}/night × ${stay.nights} nights × ${stay.rooms} room${stay.rooms > 1 ? "s" : ""}.`,
+        severity: "warning",
+      });
+    }
   }
 
   if (plan.budgetBreakdown) {

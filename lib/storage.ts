@@ -72,7 +72,7 @@ export function getUserPreferences(): UserPreferences {
   if (typeof window === "undefined") {
     return {
       travelStyle: "Comfortable",
-      budgetPreference: "$1,000–$2,000",
+      budgetPreference: "$150–$250/night",
       favoriteActivities: [],
       preferredPace: "Balanced",
     };
@@ -83,14 +83,14 @@ export function getUserPreferences(): UserPreferences {
       ? JSON.parse(raw)
       : {
           travelStyle: "Comfortable",
-          budgetPreference: "$1,000–$2,000",
+          budgetPreference: "$150–$250/night",
           favoriteActivities: [],
           preferredPace: "Balanced",
         };
   } catch {
     return {
       travelStyle: "Comfortable",
-      budgetPreference: "$1,000–$2,000",
+      budgetPreference: "$150–$250/night",
       favoriteActivities: [],
       preferredPace: "Balanced",
     };

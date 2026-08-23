@@ -1,35 +1,37 @@
 @import "tailwindcss";
 
 @theme {
-  /* Core surfaces — warm light foundation */
-  --color-background: #f5f1e8;
-  --color-surface: #eae5da;
-  --color-section-alt: #e3ddd2;
-  --color-surface-elevated: #eae5da;
-  --color-surface-hover: #e3ddd2;
+  /* Warm Ivory — main surface */
+  --color-background: #f4f0e7;
+  --color-surface: #ebe6da;
+  --color-section-alt: #e4dfd2;
+  --color-surface-elevated: #ebe6da;
+  --color-surface-hover: #e8e2d4;
 
   /* Borders */
-  --color-border: rgba(37, 35, 41, 0.1);
-  --color-border-accent: rgba(175, 160, 208, 0.45);
+  --color-border: rgba(23, 37, 58, 0.12);
+  --color-border-accent: rgba(169, 149, 214, 0.45);
 
-  /* Lavender — Blistrip identity (CTAs, nav, AI, filters, glows) */
-  --color-primary: #afa0d0;
-  --color-primary-hover: #9b8bc4;
-  --color-primary-muted: rgba(175, 160, 208, 0.22);
-  --color-primary-glow: rgba(175, 160, 208, 0.18);
+  /* Dusty Lavender — brand */
+  --color-primary: #a995d6;
+  --color-primary-hover: #9480c4;
+  --color-primary-muted: rgba(169, 149, 214, 0.22);
+  --color-primary-glow: rgba(169, 149, 214, 0.18);
 
-  /* Warm cream — travel / warmth (badges, fills, overlays) */
-  --color-accent: #e3d5b8;
-  --color-accent-hover: #d9c9a8;
-  --color-accent-muted: rgba(227, 213, 184, 0.55);
-  --color-accent-subtle: rgba(227, 213, 184, 0.35);
-  --color-accent-text: #6b5c45;
+  /* Soft Gold — secondary accent */
+  --color-accent: #d8c28a;
+  --color-accent-hover: #c9b176;
+  --color-accent-muted: rgba(216, 194, 138, 0.55);
+  --color-accent-subtle: rgba(216, 194, 138, 0.35);
+  --color-accent-text: #8b7348;
 
-  --color-secondary: #6b6870;
+  /* Muted Blue — supporting accent */
+  --color-support: #8297b8;
+  --color-secondary: #8297b8;
   --color-success: #5a8a66;
-  --color-muted: #6b6870;
-  --color-foreground: #252329;
-  --color-foreground-secondary: #6b6870;
+  --color-muted: #5c6d84;
+  --color-foreground: #17253a;
+  --color-foreground-secondary: #4e5f76;
 
   --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-sub: var(--font-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
@@ -84,7 +86,7 @@
   }
 
   ::selection {
-    background: rgba(175, 160, 208, 0.35);
+    background: rgba(169, 149, 214, 0.35);
   }
 }
 

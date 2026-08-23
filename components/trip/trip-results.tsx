@@ -254,7 +254,12 @@ export function TripResults({ tripId }: TripResultsProps) {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: "Trip estimate", value: formatCurrency(totalBudget) },
-            { label: "Daily average", value: formatCurrency(dailyAvg) },
+            {
+              label: "Stay budget",
+              value: trip.nightlyStayBudget
+                ? `${formatCurrency(trip.nightlyStayBudget)}/night`
+                : formatCurrency(dailyAvg),
+            },
             { label: "Stay near", value: trip.recommendedNeighborhood },
             { label: "Style", value: trip.travelStyle },
           ].map((item) => (
@@ -429,6 +434,14 @@ export function TripResults({ tripId }: TripResultsProps) {
         <p className="eyebrow mb-2">Budget</p>
         <h2 className="text-2xl font-bold mb-2">Estimate</h2>
         <p className="text-base text-muted mb-6">Planning figures only — not live prices.</p>
+        {trip.nightlyStayBudget && trip.stayNights ? (
+          <p className="text-sm text-foreground-secondary mb-4 max-w-lg">
+            Stays are based on {formatCurrency(trip.nightlyStayBudget)}/night
+            {trip.stayRooms && trip.stayRooms > 1 ? ` × ${trip.stayRooms} rooms` : ""} × {trip.stayNights} night
+            {trip.stayNights === 1 ? "" : "s"}
+            {` = ${formatCurrency(trip.budgetBreakdown.accommodation)}`}.
+          </p>
+        ) : null}
         <Card className="p-6 max-w-lg">
           <div className="space-y-4">
             <BudgetBar label="Accommodation" amount={trip.budgetBreakdown.accommodation} total={totalBudget} color="bg-accent" />
@@ -579,11 +592,11 @@ function PhotoPlaceCard({
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(to top, #ffffff 0%, #ffffff 18%, rgba(255,255,255,0.9) 36%, rgba(255,255,255,0.45) 58%, rgba(255,255,255,0) 78%)",
+              "linear-gradient(to top, #f4f0e7 0%, #f4f0e7 18%, rgba(244,240,231,0.9) 36%, rgba(244,240,231,0.45) 58%, rgba(244,240,231,0) 78%)",
           }}
         />
         {category && (
-          <Badge variant="secondary" className="absolute top-2 left-2 z-10 bg-white/90 text-xs">
+          <Badge variant="secondary" className="absolute top-2 left-2 z-10 bg-background/90 text-xs">
             {category}
           </Badge>
         )}
@@ -591,17 +604,17 @@ function PhotoPlaceCard({
           <button
             type="button"
             onClick={onRemove}
-            className="absolute top-2 right-2 z-10 rounded-md bg-white/90 p-1 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-white group-hover:opacity-100"
+            className="absolute top-2 right-2 z-10 rounded-md bg-background/90 p-1 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-surface group-hover:opacity-100"
             aria-label={`Remove ${title}`}
           >
             <X className="h-3.5 w-3.5" />
           </button>
         )}
         <div className="absolute inset-x-0 bottom-0 z-10 p-3">
-          <h3 className="text-[15px] font-semibold leading-5 text-[#252329] line-clamp-2">{title}</h3>
-          {line && <p className="mt-0.5 text-xs leading-4 text-[#4a4750] line-clamp-1">{line}</p>}
+          <h3 className="text-[15px] font-semibold leading-5 text-foreground line-clamp-2">{title}</h3>
+          {line && <p className="mt-0.5 text-xs leading-4 text-foreground-secondary line-clamp-1">{line}</p>}
           {rating != null && rating > 0 && (
-            <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#252329]">
+            <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-foreground">
               <Star className="h-3 w-3" />
               {rating}
               {reviewCount ? ` · ${reviewCount}` : ""}
@@ -623,7 +636,7 @@ function PhotoPlaceCard({
                 href={mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs font-medium text-[#252329] hover:text-primary"
+                className="text-xs font-medium text-foreground hover:text-primary"
               >
                 Open in Google
               </a>
@@ -660,7 +673,7 @@ function ItineraryStopCard({
         <button
           type="button"
           onClick={onRemove}
-          className="absolute top-1.5 right-1.5 z-10 rounded-md bg-white/90 p-1 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-white group-hover:opacity-100"
+          className="absolute top-1.5 right-1.5 z-10 rounded-md bg-background/90 p-1 text-foreground shadow-sm opacity-0 transition-opacity hover:bg-surface group-hover:opacity-100"
           aria-label={`Remove ${activity.name}`}
         >
           <X className="h-3.5 w-3.5" />

@@ -145,6 +145,9 @@ export interface TripPlan {
   dates: string;
   duration: number;
   estimatedBudget: number;
+  nightlyStayBudget?: number;
+  stayNights?: number;
+  stayRooms?: number;
   travelStyle: string;
   interests: string[];
   recommendedNeighborhood: string;
@@ -211,7 +214,13 @@ export interface UserPreferences {
 }
 
 export const TRAVELER_OPTIONS = ["Solo", "Couple", "Friends", "Family"] as const;
-export const BUDGET_OPTIONS = ["<$500", "$500–$1,000", "$1,000–$2,000", "$2,000–$4,000", "$4,000+"] as const;
+export const BUDGET_OPTIONS = [
+  "Under $80/night",
+  "$80–$150/night",
+  "$150–$250/night",
+  "$250–$400/night",
+  "$400+/night",
+] as const;
 export const INTEREST_OPTIONS = [
   "Nightlife",
   "History",
