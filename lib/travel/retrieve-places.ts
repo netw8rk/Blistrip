@@ -25,6 +25,7 @@ import {
 import { recordSelectedPlaces } from "@/lib/planning/recent-places";
 import { GooglePlacesProvider, isExcludedGoogleTypes } from "./providers/google-places";
 import { cityHeroQueries, pickCityHeroPhoto } from "./city-hero-photo";
+import { getCuratedDestinationHeroPhoto } from "./curated-destination-photos";
 import type { BudgetEstimate, PlannedActivity, StructuredItineraryDraft } from "@/lib/planning/types";
 import { draftToDailyItinerary } from "@/lib/planning/merge";
 import {
@@ -411,7 +412,9 @@ export async function retrievePersonalizedPlaces(
     restaurants: restaurantsSlice,
     diningAndNightlife: diningSlice,
     topRated,
-    destinationPhotoUrl: pickCityHeroPhoto(heroPlaces),
+    destinationPhotoUrl:
+      getCuratedDestinationHeroPhoto(workingPrefs.destination || osmRaw?.city || "") ??
+      pickCityHeroPhoto(heroPlaces),
     debug: {
       queries: searches,
       queryResultCounts,

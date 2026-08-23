@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { examplePragueTrip } from "@/lib/mock-data";
-import { images, getDestinationImage } from "@/lib/images";
+import { images } from "@/lib/images";
+import { getCuratedDestinationHeroPhoto } from "@/lib/travel/curated-destination-photos";
 import { DestinationCarousel } from "@/components/landing/destination-carousel";
 
 function SectionHeader({
@@ -330,11 +331,13 @@ export function ExampleTripSection() {
             {/* Trip image */}
             <div className="relative mb-6 h-72 w-full overflow-hidden rounded-xl sm:h-80">
               <Image
-                src={getDestinationImage("Prague", 800)}
-                alt="Charles Bridge and Prague Castle at golden hour"
+                src={getCuratedDestinationHeroPhoto("Prague", 3200) ?? images.hero}
+                alt="Charles Bridge and Prague Castle over the Vltava"
                 fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 50vw"
+                unoptimized
+                quality={95}
               />
             </div>
 

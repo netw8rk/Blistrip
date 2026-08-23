@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, Loader2, MapPin } from "lucide-react";
+import { Check, Loader2, MapPin, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { DestinationSuggestion } from "@/lib/travel/suggest-places";
@@ -88,8 +88,15 @@ export function DestinationPicker({
 
   return (
     <div ref={wrapRef} className="relative">
-      <div className="relative">
-        <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-xl border transition-all duration-200",
+          selected
+            ? "border-border-accent bg-primary-muted/20 shadow-[0_0_0_1px_rgba(169,149,214,0.12)]"
+            : "border-border/60 bg-background/60 hover:border-border hover:bg-background/80"
+        )}
+      >
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
         <Input
           placeholder="Start typing a city, then pick it from the list"
           value={selected ? selectedLabel || value : value}
@@ -112,7 +119,7 @@ export function DestinationPicker({
               setOpen(false);
             }
           }}
-          className="h-12 rounded-xl border-border/70 bg-background/70 pl-10 pr-10"
+          className="h-12 rounded-xl border-0 bg-transparent pl-11 pr-11 shadow-none focus-visible:ring-0"
           autoComplete="off"
           autoFocus={autoFocus}
           role="combobox"
@@ -121,24 +128,24 @@ export function DestinationPicker({
           aria-autocomplete="list"
         />
         {loading && (
-          <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted animate-spin" />
+          <Loader2 className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted animate-spin" />
         )}
         {selected && !loading && (
-          <Check className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
+          <Check className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
         )}
       </div>
       {open && suggestions.length > 0 && (
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-border/80 bg-surface/95 shadow-sm backdrop-blur-md"
+          className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-border/70 bg-surface/95 p-1 shadow-[0_20px_50px_-24px_rgba(42,36,28,0.45)] backdrop-blur-md"
         >
           {suggestions.map((suggestion, index) => (
             <li key={suggestion.id} role="option" aria-selected={index === highlight}>
               <button
                 type="button"
                 className={cn(
-                  "flex w-full items-start gap-3 px-4 py-3 text-left text-sm transition-colors",
+                  "flex w-full items-start gap-3 rounded-lg px-3.5 py-3 text-left text-sm transition-colors",
                   index === highlight
                     ? "bg-primary-muted text-foreground"
                     : "text-foreground-secondary hover:bg-surface-hover"
@@ -146,7 +153,7 @@ export function DestinationPicker({
                 onMouseEnter={() => setHighlight(index)}
                 onClick={() => pick(suggestion)}
               >
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" />
                 <span>{suggestion.label}</span>
               </button>
             </li>
@@ -154,13 +161,14 @@ export function DestinationPicker({
         </ul>
       )}
       {selected && selectedLabel && (
-        <p className="mt-2.5 text-sm text-foreground-secondary">
+        <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-border/60 bg-surface/40 px-3 py-1 text-xs text-foreground-secondary">
+          <MapPin className="h-3.5 w-3.5 text-primary" />
           We&apos;ll search around{" "}
           <span className="font-medium text-foreground">{selectedLabel}</span>
         </p>
       )}
       {!selected && value.trim().length >= 2 && !loading && suggestions.length === 0 && (
-        <p className="mt-2.5 text-sm text-muted">
+        <p className="mt-3 text-sm text-muted">
           No matching places yet. Try a city name, then pick one from the list.
         </p>
       )}

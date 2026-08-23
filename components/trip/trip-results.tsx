@@ -29,9 +29,10 @@ import {
   setActiveTrip,
 } from "@/lib/storage";
 import type { ActivityRecommendation, DailyItinerary, ItineraryActivity, RestaurantRecommendation, TripPlan } from "@/types/trip";
-import { getHeroDestinationImage, getPlaceFallbackImage } from "@/lib/images";
+import { getPlaceFallbackImage } from "@/lib/images";
 import { writeDayGuideNote } from "@/lib/travel/day-guide";
-import { googleHeroPhotoSrc, googlePlacePageUrl, isGooglePhotoSrc, withGooglePhotoWidth } from "@/lib/travel/google-links";
+import { googlePlacePageUrl, isGooglePhotoSrc, withGooglePhotoWidth } from "@/lib/travel/google-links";
+import { TripHeroPhoto } from "@/components/travel/destination-photo-image";
 import { TripRefinePanel } from "@/components/trip/trip-refine-panel";
 import {
   AddToItineraryButton,
@@ -61,7 +62,6 @@ export function TripResults({ tripId }: TripResultsProps) {
   const [showAllTopRated, setShowAllTopRated] = useState(false);
   const [activityTypeFilter, setActivityTypeFilter] = useState("all");
   const [whyDialog, setWhyDialog] = useState<{ title: string; reason: string } | null>(null);
-  const [heroPhotoUrl, setHeroPhotoUrl] = useState<string | undefined>();
 
   useEffect(() => {
     const preferActive = searchParams.get("fresh") === "1";
@@ -74,28 +74,6 @@ export function TripResults({ tripId }: TripResultsProps) {
       window.history.replaceState(null, "", `/trip/${plan.id}`);
     }
   }, [tripId, searchParams]);
-
-  useEffect(() => {
-    if (!trip) return;
-    if (trip.destinationLatitude == null || trip.destinationLongitude == null) {
-      setHeroPhotoUrl(undefined);
-      return;
-    }
-    const params = new URLSearchParams({
-      city: trip.destination,
-      country: trip.country ?? "",
-      lat: String(trip.destinationLatitude),
-      lng: String(trip.destinationLongitude),
-    });
-    fetch(`/api/places/destination-photo?${params}`)
-      .then((res) => res.json() as Promise<{ photoUrl?: string | null }>)
-      .then((data) => {
-        setHeroPhotoUrl(data.photoUrl || undefined);
-      })
-      .catch(() => {
-        setHeroPhotoUrl(undefined);
-      });
-  }, [trip]);
 
   const persist = (next: TripPlan) => {
     setTrip(next);
@@ -201,25 +179,13 @@ export function TripResults({ tripId }: TripResultsProps) {
           </Button>
         </div>
 
-        <div className="relative h-52 sm:h-72 overflow-hidden">
-          <Image
-            src={googleHeroPhotoSrc(heroPhotoUrl, 2400) || getHeroDestinationImage(trip.destination)}
-            alt={trip.destination}
-            fill
-            unoptimized={isGooglePhotoSrc(heroPhotoUrl)}
-            className="object-cover object-center"
-            sizes="100vw"
-            quality={95}
-            priority
-          />
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5"
-            style={{
-              background:
-                "linear-gradient(to top, var(--color-background) 0%, rgba(245,241,232,0.82) 42%, rgba(245,241,232,0) 100%)",
-            }}
-          />
-        </div>
+        <TripHeroPhoto
+          city={trip.destination}
+          country={trip.country}
+          latitude={trip.destinationLatitude}
+          longitude={trip.destinationLongitude}
+          storedPhotoUrl={trip.destinationPhotoUrl}
+        />
 
         <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-8 pt-5 pb-4">
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] xl:grid-cols-[minmax(0,1fr)_minmax(26rem,34rem)] lg:gap-8">

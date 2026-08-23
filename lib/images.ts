@@ -6,7 +6,7 @@
 const PHOTOS = {
   heroParis: "1566902145833-0475c9f1a1bf",
   ctaMountains: "1476514525535-07fb3b4ae5f1",
-  prague: "1600623471616-8c1966c91ff6",
+  prague: "1771777247272-cf7b7dc51bae",
   budapest: "1548013146-72479768bada",
   krakow: "1516550893923-42d28e5677af",
   vienna: "1516550893923-42d28e5677af",
@@ -29,7 +29,17 @@ const PHOTOS = {
 } as const;
 
 export function getImageUrl(photoId: string, width = 800): string {
-  return `https://images.unsplash.com/photo-${photoId}?auto=format&fit=crop&w=${width}&q=90&dpr=2`;
+  const w = Math.min(4800, Math.max(400, Math.round(width)));
+  return `https://images.unsplash.com/photo-${photoId}?auto=format&fit=crop&w=${w}&q=95`;
+}
+
+export function isUnsplashPhotoSrc(src?: string): boolean {
+  return Boolean(src?.includes("images.unsplash.com/photo-"));
+}
+
+/** Serve CDN photos directly — Next.js re-encoding makes Unsplash heroes look soft. */
+export function shouldServePhotoDirectly(src?: string): boolean {
+  return isUnsplashPhotoSrc(src) || Boolean(src?.startsWith("/api/places/photo"));
 }
 
 export const images = {

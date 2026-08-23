@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { popularDestinations, getPopularDestinationImage, type PopularDestination } from "@/lib/images";
-import { googleHeroPhotoSrc, isGooglePhotoSrc } from "@/lib/travel/google-links";
+import { popularDestinations, getPopularDestinationImage, shouldServePhotoDirectly, type PopularDestination } from "@/lib/images";
+import { getCuratedDestinationHeroPhoto } from "@/lib/travel/curated-destination-photos";
+import { googleHeroPhotoSrc } from "@/lib/travel/google-links";
 import { cn } from "@/lib/utils";
 
 function DestinationCarouselCard({ dest }: { dest: PopularDestination }) {
-  const fallback = getPopularDestinationImage(dest.photoId);
+  const fallback =
+    getCuratedDestinationHeroPhoto(dest.name, 1600) ?? getPopularDestinationImage(dest.photoId, 1600);
   const [photoSrc, setPhotoSrc] = useState(fallback);
 
   useEffect(() => {
@@ -26,11 +28,15 @@ function DestinationCarouselCard({ dest }: { dest: PopularDestination }) {
       .then((res) => res.json() as Promise<{ photoUrl?: string | null }>)
       .then((data) => {
         if (data.photoUrl) {
-          setPhotoSrc(googleHeroPhotoSrc(data.photoUrl, 560) ?? fallback);
+          setPhotoSrc(
+            shouldServePhotoDirectly(data.photoUrl)
+              ? data.photoUrl
+              : googleHeroPhotoSrc(data.photoUrl, 1600) ?? fallback
+          );
         }
       })
       .catch(() => {});
-  }, [dest.country, dest.latitude, dest.longitude, dest.name, dest.photoId]);
+  }, [dest.country, dest.latitude, dest.longitude, dest.name, dest.photoId, fallback]);
 
   return (
     <Link
@@ -45,7 +51,7 @@ function DestinationCarouselCard({ dest }: { dest: PopularDestination }) {
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           sizes="(max-width: 640px) 72vw, (max-width: 1024px) 44vw, 280px"
-          unoptimized={isGooglePhotoSrc(photoSrc)}
+          unoptimized={shouldServePhotoDirectly(photoSrc)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
         <div className="absolute bottom-3 left-3 right-3">

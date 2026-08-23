@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DestinationPhotoImage } from "@/components/travel/destination-photo-image";
 import { preplannedGetaways } from "@/lib/preplanned-getaways";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
@@ -31,12 +31,15 @@ export function PreplannedGetawaysSection() {
           >
             <div className="grid md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
               <div className="relative min-h-[12rem] md:min-h-full">
-                <Image
-                  src={getaway.imageUrl}
+                <DestinationPhotoImage
+                  city={getaway.destination}
+                  country={getaway.country}
+                  latitude={getaway.latitude}
+                  longitude={getaway.longitude}
+                  width={2400}
                   alt={`${getaway.destination}, ${getaway.country}`}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 208px"
+                  className="absolute inset-0"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 420px"
                 />
                 <Badge variant="accent" className="absolute left-3 top-3 z-10 bg-background/90 text-xs">
                   {getaway.category}

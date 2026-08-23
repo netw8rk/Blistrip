@@ -1,4 +1,3 @@
-import { getDestinationImage } from "@/lib/images";
 import type { TripPlannerInput } from "@/types/trip";
 
 export interface PreplannedDayHighlight {
@@ -17,7 +16,6 @@ export interface PreplannedGetaway {
   longitude: number;
   durationDays: number;
   tagline: string;
-  imageUrl: string;
   dayHighlights: PreplannedDayHighlight[];
   budget: TripPlannerInput["budget"];
   travelers: TripPlannerInput["travelers"];
@@ -38,7 +36,6 @@ export const preplannedGetaways: PreplannedGetaway[] = [
     longitude: 14.4378,
     durationDays: 4,
     tagline: "Gothic squares, castle views, and beer halls at easy-going prices.",
-    imageUrl: getDestinationImage("Prague", 1200),
     dayHighlights: [
       { day: 1, title: "Old Town & Astronomical Clock", note: "Morning walk through Staroměstské náměstí, evening riverside." },
       { day: 2, title: "Prague Castle & Malá Strana", note: "Cathedral views, then café time in the Lesser Quarter." },
@@ -61,7 +58,6 @@ export const preplannedGetaways: PreplannedGetaway[] = [
     longitude: 19.0402,
     durationDays: 3,
     tagline: "Thermal baths by day, Szimpla-style bars and Danube nights.",
-    imageUrl: getDestinationImage("Budapest", 1200),
     dayHighlights: [
       { day: 1, title: "Baths & District VII", note: "Széchenyi or Gellért, then easy dinner near ruin bars." },
       { day: 2, title: "Pest nightlife loop", note: "Late start, bar-hopping, keep mornings open." },
@@ -84,7 +80,6 @@ export const preplannedGetaways: PreplannedGetaway[] = [
     longitude: 12.4964,
     durationDays: 5,
     tagline: "Ancient icons, trattoria lunches, and unhurried piazza evenings.",
-    imageUrl: getDestinationImage("Rome", 1200),
     dayHighlights: [
       { day: 1, title: "Colosseum & Forum", note: "Core ancient Rome with a long lunch break." },
       { day: 2, title: "Vatican & Trastevere", note: "Museums morning, neighborhood dinner." },
@@ -106,7 +101,6 @@ export const preplannedGetaways: PreplannedGetaway[] = [
     longitude: 2.1686,
     durationDays: 4,
     tagline: "Gaudí mornings, Barceloneta afternoons, tapas until late.",
-    imageUrl: getDestinationImage("Barcelona", 1200),
     dayHighlights: [
       { day: 1, title: "Sagrada Família & Eixample", note: "Book-ahead landmark, modernist streets." },
       { day: 2, title: "Gothic Quarter & beach", note: "Old city loop, sunset by the water." },
@@ -128,7 +122,6 @@ export const preplannedGetaways: PreplannedGetaway[] = [
     longitude: -9.1393,
     durationDays: 4,
     tagline: "Miradouro views, pastel de nata stops, and tram-hop exploring.",
-    imageUrl: getDestinationImage("Lisbon", 1200),
     dayHighlights: [
       { day: 1, title: "Alfama & viewpoints", note: "Hilly streets, fado-friendly evening." },
       { day: 2, title: "Belém & riverfront", note: "Pastry break, relaxed waterfront time." },
@@ -151,7 +144,6 @@ export const preplannedGetaways: PreplannedGetaway[] = [
     longitude: 2.3522,
     durationDays: 4,
     tagline: "Museum mornings, Left Bank strolls, and candlelit dinners.",
-    imageUrl: getDestinationImage("Paris", 1200),
     dayHighlights: [
       { day: 1, title: "Louvre & Tuileries", note: "One major museum, plenty of café time." },
       { day: 2, title: "Montmartre & Marais", note: "Village views and boutique browsing." },
@@ -173,7 +165,6 @@ export const preplannedGetaways: PreplannedGetaway[] = [
     longitude: 4.9041,
     durationDays: 3,
     tagline: "Museum district, canal walks, and easy cycling days.",
-    imageUrl: getDestinationImage("Amsterdam", 1200),
     dayHighlights: [
       { day: 1, title: "Canal belt & Jordaan", note: "Waterfront loops and brown-café stops." },
       { day: 2, title: "Museumplein", note: "Rijksmuseum or Van Gogh, park break." },

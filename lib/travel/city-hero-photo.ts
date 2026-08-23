@@ -49,6 +49,14 @@ const PARK_CITY_VIEW =
 
 export function cityHeroQueries(destinationLabel: string): string[] {
   const place = destinationLabel.trim();
+  const key = place.toLowerCase().replace(/[^a-z]/g, "");
+  if (key === "prague" || key === "praha") {
+    return [
+      "Charles Bridge Prague",
+      "Prague Castle Vltava river view",
+      "Prague Old Town Square skyline",
+    ];
+  }
   return [`${place} skyline`, `${place} cityscape downtown`, `${place} old town streets`];
 }
 
@@ -72,9 +80,13 @@ export function isCityscapePlace(place: {
   return false;
 }
 
+const PRAGUE_LANDMARK =
+  /\b(charles bridge|karl[uů]v most|prague castle|pražský hrad|old town square|starom[eě]stsk[eé] n[aá]m[eě]st[ií]|st\.?\s*vitus|mal[aá]\s*strana)\b/i;
+
 export function scoreCityscapePlace(place: NormalizedPlace): number {
   let score = place.rating ?? 0;
   const name = place.name;
+  if (PRAGUE_LANDMARK.test(name)) score += 28;
   if (/\b(skyline|cityscape)\b/i.test(name)) score += 24;
   if (/\b(downtown|old town|old city)\b/i.test(name)) score += 12;
   if (/\b(square|plaza|piazza|platz|bridge|street|boulevard)\b/i.test(name)) score += 8;

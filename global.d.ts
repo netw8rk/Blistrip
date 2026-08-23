@@ -1,1 +1,7 @@
-declare module "*.css";
+declare module "*.css" {
+  export {};
+}
+
+declare module "*.scss" {
+  export {};
+}
