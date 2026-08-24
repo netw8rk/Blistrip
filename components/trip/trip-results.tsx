@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
 import {
   MapPin,
   Bookmark,
@@ -31,8 +30,9 @@ import {
 import type { ActivityRecommendation, DailyItinerary, ItineraryActivity, RestaurantRecommendation, TripPlan } from "@/types/trip";
 import { getPlaceFallbackImage } from "@/lib/images";
 import { writeDayGuideNote } from "@/lib/travel/day-guide";
-import { googlePlacePageUrl, isGooglePhotoSrc, withGooglePhotoWidth } from "@/lib/travel/google-links";
+import { googlePlacePageUrl } from "@/lib/travel/google-links";
 import { TripHeroPhoto } from "@/components/travel/destination-photo-image";
+import { PlacePhotoImage } from "@/components/travel/place-photo-image";
 import { TripRefinePanel } from "@/components/trip/trip-refine-panel";
 import {
   AddToItineraryButton,
@@ -281,7 +281,8 @@ export function TripResults({ tripId }: TripResultsProps) {
                   photoUrl: hotel.photoUrl,
                   providerPlaceId: hotel.providerPlaceId,
                 }}
-                photoSrc={hotel.photoUrl || getPlaceFallbackImage(hotel.name, trip.destination, 1600)}
+                primarySrc={hotel.photoUrl}
+                fallbackSrc={getPlaceFallbackImage(hotel.name, trip.destination, 1600)}
                 detail={hotel.priceRange !== "Check current rates" ? hotel.priceRange : undefined}
                 onWhy={
                   hotel.whyRecommended
@@ -349,11 +350,8 @@ export function TripResults({ tripId }: TripResultsProps) {
                             {activity ? (
                               <ItineraryStopCard
                                 activity={activity}
-                                photoSrc={
-                                  activity.photoUrl ||
-                                  resolveStopPhoto(trip, activity) ||
-                                  getPlaceFallbackImage(activity.name, trip.destination, 1600)
-                                }
+                                primarySrc={activity.photoUrl || resolveStopPhoto(trip, activity)}
+                                fallbackSrc={getPlaceFallbackImage(activity.name, trip.destination, 1600)}
                                 onRemove={() => removeStop(day.day, period, row)}
                                 onWhy={() =>
                                   setWhyDialog({
@@ -652,7 +650,8 @@ function resolveStopPhoto(trip: TripPlan, stop: ItineraryActivity): string | und
 
 function PhotoPlaceCard({
   title,
-  photoSrc,
+  primarySrc,
+  fallbackSrc,
   category,
   line,
   rating,
@@ -663,7 +662,8 @@ function PhotoPlaceCard({
   actions,
 }: {
   title: string;
-  photoSrc: string;
+  primarySrc?: string | null;
+  fallbackSrc: string;
   category?: string;
   line?: string;
   rating?: number;
@@ -676,11 +676,12 @@ function PhotoPlaceCard({
   return (
     <article className="group relative overflow-hidden rounded-[var(--radius-card)] border border-border/70 isolate">
       <div className="relative aspect-[5/4]">
-        <Image
-          src={withGooglePhotoWidth(photoSrc, 900) || photoSrc}
+        <PlacePhotoImage
+          primarySrc={primarySrc}
+          fallbackSrc={fallbackSrc}
+          width={900}
           alt={title}
           fill
-          unoptimized={isGooglePhotoSrc(photoSrc)}
           className="object-cover"
           sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw"
           quality={85}
@@ -743,13 +744,15 @@ function PhotoPlaceCard({
 
 function ItineraryStopCard({
   activity,
-  photoSrc,
+  primarySrc,
+  fallbackSrc,
   onRemove,
   onWhy,
   detail,
 }: {
   activity: ItineraryActivity;
-  photoSrc: string;
+  primarySrc?: string | null;
+  fallbackSrc: string;
   onRemove?: () => void;
   onWhy?: () => void;
   detail?: string;
@@ -757,11 +760,12 @@ function ItineraryStopCard({
   return (
     <div className="group relative flex gap-3">
       <div className="relative w-[37%] shrink-0 aspect-[4/3] overflow-hidden rounded-lg">
-        <Image
-          src={withGooglePhotoWidth(photoSrc, 480) || photoSrc}
+        <PlacePhotoImage
+          primarySrc={primarySrc}
+          fallbackSrc={fallbackSrc}
+          width={480}
           alt={activity.name}
           fill
-          unoptimized={isGooglePhotoSrc(photoSrc)}
           className="object-cover"
           sizes="(max-width: 640px) 37vw, 12vw"
         />
@@ -942,7 +946,8 @@ function RecommendationCard({
   return (
     <PhotoPlaceCard
       title={title}
-      photoSrc={photoUrl || fallbackImage}
+      primarySrc={photoUrl}
+      fallbackSrc={fallbackImage}
       category={category}
       line={line}
       rating={rating}

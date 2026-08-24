@@ -104,6 +104,7 @@ export function useDestinationPhoto(options: {
 
   return {
     src,
+    fallback,
     phase,
     isGoogle: isGooglePhotoSrc(src ?? undefined),
     serveDirectly: shouldServePhotoDirectly(src ?? undefined),
@@ -135,7 +136,7 @@ export function DestinationPhotoImage({
   sizes: string;
   priority?: boolean;
 }) {
-  const { src, phase, serveDirectly } = useDestinationPhoto({
+  const { src, fallback, phase, serveDirectly } = useDestinationPhoto({
     city,
     country,
     latitude,
@@ -143,15 +144,25 @@ export function DestinationPhotoImage({
     storedPhotoUrl,
     width,
   });
+  const [displaySrc, setDisplaySrc] = useState<string | null>(src);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setDisplaySrc(src);
+    setFailed(false);
+  }, [src]);
+
+  const activeSrc = displaySrc ?? fallback;
+  const serveDirect = failed ? shouldServePhotoDirectly(fallback) : serveDirectly;
 
   return (
     <div className={cn("relative overflow-hidden bg-surface", className)}>
       {phase === "loading" ? (
         <div aria-hidden className="absolute inset-0 animate-pulse-soft bg-surface-hover" />
       ) : null}
-      {src ? (
+      {activeSrc ? (
         <Image
-          src={src}
+          src={activeSrc}
           alt={alt}
           fill
           priority={priority}
@@ -162,7 +173,13 @@ export function DestinationPhotoImage({
             imageClassName
           )}
           sizes={sizes}
-          unoptimized={serveDirectly}
+          unoptimized={serveDirect}
+          onError={() => {
+            if (!failed) {
+              setDisplaySrc(fallback);
+              setFailed(true);
+            }
+          }}
         />
       ) : null}
     </div>
@@ -182,23 +199,40 @@ export function TripHeroPhoto({
   longitude?: number | null;
   storedPhotoUrl?: string | null;
 }) {
-  const { src, phase, serveDirectly } = useDestinationPhoto({
+  const { src, fallback, phase, serveDirectly } = useDestinationPhoto({
     city,
     country,
     latitude,
     longitude,
     storedPhotoUrl,
-    width: 4800,
+    width: 1600,
   });
+  const [displaySrc, setDisplaySrc] = useState<string | null>(src);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setDisplaySrc(src);
+    setFailed(false);
+  }, [src]);
+
+  const handleError = () => {
+    if (!failed && fallback) {
+      setDisplaySrc(fallback);
+      setFailed(true);
+    }
+  };
+
+  const activeSrc = displaySrc ?? fallback;
+  const serveDirect = failed ? shouldServePhotoDirectly(fallback) : serveDirectly;
 
   return (
     <div className="relative h-52 overflow-hidden bg-surface sm:h-80">
       {phase === "loading" ? (
         <div aria-hidden className="absolute inset-0 animate-pulse-soft bg-surface-hover" />
       ) : null}
-      {src ? (
+      {activeSrc ? (
         <Image
-          src={src}
+          src={activeSrc}
           alt={city}
           fill
           priority
@@ -208,7 +242,8 @@ export function TripHeroPhoto({
             phase === "loading" ? "opacity-0" : "opacity-100"
           )}
           sizes="100vw"
-          unoptimized={serveDirectly}
+          unoptimized={serveDirect}
+          onError={handleError}
         />
       ) : null}
       <div

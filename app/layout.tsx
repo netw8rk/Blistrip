@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
-import { VercelAnalytics } from "@/components/analytics/vercel-analytics";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Navbar />
         <main className="flex-1 pt-16">{children}</main>
         <Footer />
-        <VercelAnalytics />
+        <Analytics />
       </body>
     </html>
   );
