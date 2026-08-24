@@ -93,7 +93,7 @@ export function buildSearchRequirements(profile: SearchableProfile | TripProfile
   add("local", "attraction", "local neighborhoods hidden gems", s.localExperiences, "attraction", "afternoon");
 
   const interestList = (
-    "interests" in profile ? profile.interests : profile.selectedInterests ?? []
+    ("interests" in profile ? profile.interests : profile.selectedInterests) ?? []
   ).map((item) => item.toLowerCase());
   if (interestList.includes("sports") || s.adventure >= 8) {
     add("sports", "activity", "stadiums sports venues", Math.max(s.adventure, 8), "activity", "afternoon");

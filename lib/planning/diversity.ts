@@ -211,9 +211,9 @@ export function buildDayShapes(prefs: UserTripPreferences, seed: number): DaySha
   const morningPool = interests.filter((item) => item !== "entertainment");
   const afternoonPool = interests.filter((item) => item !== "entertainment");
   const eveningPool = interests.filter((item) => item === "food" || item === "entertainment" || item === "culture");
-  const morningOptions = morningPool.length ? morningPool : ["culture"];
-  const afternoonOptions = afternoonPool.length ? afternoonPool : morningOptions;
-  const eveningOptions = eveningPool.length ? eveningPool : ["food"];
+  const morningOptions: InterestCategory[] = morningPool.length ? morningPool : ["culture"];
+  const afternoonOptions: InterestCategory[] = afternoonPool.length ? afternoonPool : morningOptions;
+  const eveningOptions: InterestCategory[] = eveningPool.length ? eveningPool : ["food"];
 
   return Array.from({ length: days }, (_, index) => {
     const morning = morningOptions[(index + seed) % morningOptions.length];
